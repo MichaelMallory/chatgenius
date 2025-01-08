@@ -115,7 +115,14 @@
     - Created EmojiPicker component with Popover UI
     - Added emoji insertion at cursor position
     - Added comprehensive test coverage
-  - [ ] Message actions (edit, delete)
+  - [x] Message actions (edit, delete)
+    - Added edit and delete buttons that appear on hover for user's own messages
+    - Implemented message editing with Markdown preview and real-time updates
+    - Added delete confirmation dialog using Radix UI AlertDialog
+    - Added optimistic updates for better UX
+    - Added comprehensive test coverage for all actions
+    - Implemented proper error handling with toast notifications
+    - Added real-time subscription for edited and deleted messages
 - [ ] Implement reactions system
   - [ ] Emoji picker for reactions
   - [ ] Real-time reaction updates

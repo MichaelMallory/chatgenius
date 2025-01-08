@@ -90,21 +90,34 @@ export function MessageList({ channelId }: MessageListProps) {
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         )
       })
+    } else if (payload.eventType === 'DELETE' && payload.old.channel_id === channelId) {
+      setMessages((prev) => prev.filter((msg) => msg.id !== payload.old.id))
+    } else if (payload.eventType === 'UPDATE' && payload.new.channel_id === channelId) {
+      setMessages((prev) => prev.map((msg) => 
+        msg.id === payload.new.id ? { ...msg, content: payload.new.content } : msg
+      ))
     }
   }, {
     filter: `channel_id=eq.${channelId}`
   })
+
+  const handleDelete = (messageId: string) => {
+    setMessages((prev) => prev.filter((msg) => msg.id !== messageId))
+  }
 
   return (
     <div className="flex flex-col gap-2 p-4">
       {messages.map((message) => (
         <Message
           key={message.id}
+          id={message.id}
           content={message.content}
           username={message.profiles.username}
           avatarUrl={message.profiles.avatar_url || undefined}
           createdAt={new Date(message.created_at)}
-          isCurrentUser={message.user_id === user?.id}
+          userId={message.user_id}
+          channelId={message.channel_id}
+          onDelete={handleDelete}
         />
       ))}
     </div>
