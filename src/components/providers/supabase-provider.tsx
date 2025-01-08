@@ -21,19 +21,72 @@ export default function SupabaseProvider({ children }: { children: React.ReactNo
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const initAuth = async () => {
+      try {
+        // Check active sessions and sets the user
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        
+        console.log('Initial auth check:', {
+          hasSession: !!session,
+          userId: session?.user?.id,
+          error: sessionError
+        })
+
+        if (sessionError) throw sessionError
+        
+        setUser(session?.user ?? null)
+        setLoading(false)
+
+        if (session?.user) {
+          // Verify user has necessary data
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single()
+
+          console.log('Profile check:', {
+            hasProfile: !!profile,
+            error: profileError
+          })
+
+          if (profileError) {
+            // Try to create profile
+            const { error: createError } = await supabase
+              .from('profiles')
+              .insert({
+                id: session.user.id,
+                username: session.user.email?.split('@')[0] || 'user',
+                full_name: session.user.email?.split('@')[0] || 'User'
+              })
+
+            console.log('Profile creation attempt:', {
+              error: createError
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Error in auth initialization:', error)
+        setLoading(false)
+      }
+    }
+
+    initAuth()
+
+    // Listen for changes on auth state
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', {
+        event,
+        userId: session?.user?.id
+      })
+
       setUser(session?.user ?? null)
       setLoading(false)
     })
 
-    // Listen for changes on auth state (logged in, signed out, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
-
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
   return (

@@ -45,32 +45,76 @@
     - Created type-safe env configuration with Zod
 
 ## Database & Authentication Setup (Day 1 Afternoon)
-- [ ] Set up Supabase project
-  - [ ] Create database schema
-    - [ ] Users table
-    - [ ] Channels table
-    - [ ] Messages table
-    - [ ] Threads table
-    - [ ] Files table
-    - [ ] User_Channels table
-  - [ ] Configure Row Level Security policies
-  - [ ] Set up real-time subscriptions
-- [ ] Implement authentication
-  - [ ] Configure Supabase Auth
-  - [ ] Create login/signup pages
-  - [ ] Implement OAuth providers
-  - [ ] Set up protected routes
+- [x] Set up Supabase project
+  - [x] Create database schema
+    - [x] Users table (profiles table with username, full_name, avatar_url, status)
+    - [x] Channels table (name, description, is_private, created_by)
+    - [x] Messages table (content, user_id, channel_id, parent_id for threads)
+    - [x] Files table (name, size, type, url, message_id)
+    - [x] User_Channels table (user_id, channel_id, role)
+    - [x] Reactions table (emoji, user_id, message_id)
+    - Added Row Level Security (RLS) policies for all tables
+    - Configured real-time subscriptions for messages, channels, and reactions
+    - Added trigger for automatic profile creation on user signup
+  - [x] Configure Row Level Security policies
+    - Added profile policies for public viewing and self-updates
+    - Added channel policies for creation, viewing, updates, and deletion
+    - Added user_channels policies for membership management
+    - Added message policies for channel-based access and author controls
+    - Added file policies for channel-based access and owner controls
+    - Added reaction policies for channel-based access and user controls
+  - [x] Set up real-time subscriptions
+    - Added real-time publication for all relevant tables
+    - Created change notification functions and triggers
+    - Implemented useRealtime hook for table subscriptions
+    - Added usePresence hook for user online status
+    - Set up type-safe real-time event handling
+- [x] Implement authentication
+  - [x] Configure Supabase Auth
+    - Set up Supabase auth client
+    - Added auth context provider
+    - Configured auth state management
+  - [x] Create login/signup pages
+    - Created sign-in page with email/password
+    - Created sign-up page with username/email/password
+    - Added form validation and error handling
+    - Implemented loading states
+  - [x] Implement OAuth providers
+    - Added GitHub OAuth integration
+    - Added Google OAuth integration
+    - Created OAuth callback handler
+  - [x] Set up protected routes
+    - Added authentication middleware
+    - Configured route protection
+    - Added auth state redirects
+    - Protected channel routes
 
 ## Core Chat Features (Days 2-4)
 
 ### Real-time Messaging (Day 2)
-- [ ] Set up WebSocket connections
-  - [ ] Message subscription system
-  - [ ] Real-time presence updates
-- [ ] Create message components
-  - [ ] Message input with formatting
-  - [ ] Message display with Markdown
-  - [ ] Emoji picker integration
+- [x] Set up WebSocket connections
+  - [x] Message subscription system
+    - Created Message component with avatar, username, timestamp, and content
+    - Created MessageList component with real-time updates using useRealtime hook
+    - Implemented initial message loading with Supabase query
+    - Added real-time message subscription for new messages
+  - [x] Real-time presence updates
+    - Using existing usePresence hook from use-realtime.ts
+- [x] Create message components
+  - [x] Message input with formatting
+    - Created MessageInput component with text area and formatting toolbar
+    - Added support for bold, italic, and code formatting
+    - Implemented keyboard shortcuts (Enter to send, Shift+Enter for new line)
+    - Added loading state and error handling
+  - [x] Message display with Markdown
+    - Added react-markdown with GFM (GitHub Flavored Markdown) support
+    - Styled messages with Tailwind Typography (prose)
+    - Support for bold, italic, code blocks, and links
+  - [x] Emoji picker integration
+    - Added emoji-mart integration with dark mode support
+    - Created EmojiPicker component with Popover UI
+    - Added emoji insertion at cursor position
+    - Added comprehensive test coverage
   - [ ] Message actions (edit, delete)
 - [ ] Implement reactions system
   - [ ] Emoji picker for reactions
