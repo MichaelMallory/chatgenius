@@ -2,6 +2,8 @@
 node_modules/
 .pnp
 .pnp.js
+.npm
+package-lock.json
 
 # Testing
 coverage/
@@ -11,10 +13,12 @@ coverage/
 out/
 build/
 dist/
+public/sw.js
+public/workbox-*.js
+**/next-swc.*
+**/*.node
 
-# Misc
-.DS_Store
-*.pem
+# Environment
 .env*
 .env.local
 .env.development.local
@@ -32,9 +36,17 @@ yarn-error.log*
 
 # Cache
 .cache/
-.npm/
 .eslintcache
 
 # Build artifacts
-public/sw.js
-public/workbox-*.js
+*.so
+*.so.*
+*.dll
+*.dylib
+
+# OS
+.DS_Store
+*.pem
+
+# Logs
+*.log 
