@@ -1,97 +1,36 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
-import { User } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { Database } from '@/lib/database.types'
 
-type SupabaseContextType = {
-  user: User | null
-  loading: boolean
+interface SupabaseContextType {
+  supabase: SupabaseClient<Database>
 }
 
-const SupabaseContext = createContext<SupabaseContextType>({
-  user: null,
-  loading: true,
-})
+export const SupabaseContext = createContext<SupabaseContextType | undefined>(undefined)
 
-export const useSupabase = () => useContext(SupabaseContext)
+export function useSupabase() {
+  const context = useContext(SupabaseContext)
+  if (context === undefined) {
+    throw new Error('useSupabase must be used within a SupabaseProvider')
+  }
+  return context
+}
 
-export default function SupabaseProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        // Check active sessions and sets the user
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        
-        console.log('Initial auth check:', {
-          hasSession: !!session,
-          userId: session?.user?.id,
-          error: sessionError
-        })
-
-        if (sessionError) throw sessionError
-        
-        setUser(session?.user ?? null)
-        setLoading(false)
-
-        if (session?.user) {
-          // Verify user has necessary data
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single()
-
-          console.log('Profile check:', {
-            hasProfile: !!profile,
-            error: profileError
-          })
-
-          if (profileError) {
-            // Try to create profile
-            const { error: createError } = await supabase
-              .from('profiles')
-              .insert({
-                id: session.user.id,
-                username: session.user.email?.split('@')[0] || 'user',
-                full_name: session.user.email?.split('@')[0] || 'User'
-              })
-
-            console.log('Profile creation attempt:', {
-              error: createError
-            })
-          }
-        }
-      } catch (error) {
-        console.error('Error in auth initialization:', error)
-        setLoading(false)
-      }
-    }
-
-    initAuth()
-
-    // Listen for changes on auth state
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', {
-        event,
-        userId: session?.user?.id
-      })
-
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [])
+const SupabaseProvider = ({ children }: { children: React.ReactNode }) => {
+  const [supabase] = useState(() => 
+    createClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+  )
 
   return (
-    <SupabaseContext.Provider value={{ user, loading }}>
+    <SupabaseContext.Provider value={{ supabase }}>
       {children}
     </SupabaseContext.Provider>
   )
-} 
+}
+
+export default SupabaseProvider 

@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { EmojiPicker } from './emoji-picker'
 import { useSupabase } from '@/components/providers/supabase-provider'
-import { supabase } from '@/lib/supabase'
 import { useRealtime } from '@/lib/hooks/use-realtime'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { User } from '@supabase/supabase-js'
 
 interface Reaction {
   emoji: string
@@ -16,18 +16,58 @@ interface Reaction {
 
 interface MessageReactionsProps {
   messageId: string
-  channelId: string
+  channelId: string // We'll keep this for future use if needed
   className?: string
 }
 
 export function MessageReactions({ messageId, channelId, className }: MessageReactionsProps) {
   const [reactions, setReactions] = useState<Reaction[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const { user } = useSupabase()
+  const { supabase } = useSupabase()
+  const [user, setUser] = useState<User | null>(null)
+
+  // Get and track auth state
+  useEffect(() => {
+    let mounted = true
+    
+    const setupAuth = async () => {
+      try {
+        // Get initial auth state
+        const { data: { session } } = await supabase.auth.getSession()
+        if (mounted) {
+          setUser(session?.user ?? null)
+        }
+
+        // Subscribe to auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+          if (mounted) {
+            setUser(session?.user ?? null)
+          }
+        })
+
+        return () => {
+          mounted = false
+          subscription.unsubscribe()
+        }
+      } catch (error) {
+        console.error('Error setting up auth:', error)
+        return () => {
+          mounted = false
+        }
+      }
+    }
+
+    setupAuth()
+  }, [supabase])
 
   // Load initial reactions
   useEffect(() => {
     const loadReactions = async () => {
+      if (!user) {
+        setIsLoading(false)
+        return
+      }
+
       try {
         setIsLoading(true)
         const { data, error } = await supabase
@@ -55,7 +95,7 @@ export function MessageReactions({ messageId, channelId, className }: MessageRea
           if (!acc[reaction.emoji].userIds.includes(reaction.user_id)) {
             acc[reaction.emoji].count++
             acc[reaction.emoji].userIds.push(reaction.user_id)
-            if (user?.id && reaction.user_id === user.id) {
+            if (reaction.user_id === user.id) {
               acc[reaction.emoji].reacted = true
             }
           }
@@ -65,21 +105,20 @@ export function MessageReactions({ messageId, channelId, className }: MessageRea
         setReactions(Object.values(reactionCounts))
       } catch (error) {
         console.error('Error in loadReactions:', error)
+        toast.error('Failed to load reactions')
       } finally {
         setIsLoading(false)
       }
     }
 
     loadReactions()
-  }, [messageId, user?.id])
+  }, [messageId, user])
 
   // Real-time reaction updates
   useRealtime<{ emoji: string; user_id: string; message_id: string }>(
     'reactions',
     (payload) => {
-      console.log('Reaction update received:', payload)
-
-      if (!user?.id) return
+      if (!user) return
 
       // For INSERT events
       if (payload.eventType === 'INSERT' && payload.new.message_id === messageId) {
@@ -93,7 +132,7 @@ export function MessageReactions({ messageId, channelId, className }: MessageRea
                   ? {
                       ...r,
                       count: r.count + 1,
-                      reacted: payload.new.user_id === user.id,
+                      reacted: r.reacted || payload.new.user_id === user.id,
                       userIds: [...r.userIds, payload.new.user_id]
                     }
                   : r
@@ -185,23 +224,14 @@ export function MessageReactions({ messageId, channelId, className }: MessageRea
                 : r
             )
           )
-
-          console.error('Error removing reaction:', {
-            error,
-            messageId,
-            userId: user.id,
-            emoji: emoji.native,
-            type: error.code,
-            message: error.message,
-            details: error.details
-          })
           
           if (error.code === 'PGRST301') {
             toast.error('You can only remove your own reactions')
           } else if (error.code === '42501') {
             toast.error('You don\'t have permission to remove this reaction')
           } else {
-            toast.error(`Failed to remove reaction: ${error.message}`)
+            console.error('Error removing reaction:', error)
+            toast.error('Failed to remove reaction')
           }
           return
         }
@@ -266,38 +296,26 @@ export function MessageReactions({ messageId, channelId, className }: MessageRea
                 : r
             ).filter((r) => r.count > 0)
           )
-
-          console.error('Error adding reaction:', {
-            error,
-            messageId,
-            userId: user.id,
-            emoji: emoji.native,
-            type: error.code,
-            message: error.message,
-            details: error.details
-          })
           
           if (error.code === '23505') {
             toast.error('You\'ve already added this reaction')
           } else if (error.code === '42501') {
             toast.error('You don\'t have permission to react to this message')
           } else {
-            toast.error(`Failed to add reaction: ${error.message}`)
+            console.error('Error adding reaction:', error)
+            toast.error('Failed to add reaction')
           }
           return
         }
       }
     } catch (error) {
-      console.error('Error handling reaction:', {
-        error,
-        messageId,
-        userId: user.id,
-        emoji: emoji.native,
-        type: error instanceof Error ? error.name : typeof error,
-        message: error instanceof Error ? error.message : String(error)
-      })
-      toast.error('Failed to update reaction. Please try again.')
+      console.error('Error handling reaction:', error)
+      toast.error('Failed to update reaction')
     }
+  }
+
+  if (!user) {
+    return null // Don't show reactions for logged out users
   }
 
   if (isLoading) {
@@ -305,17 +323,17 @@ export function MessageReactions({ messageId, channelId, className }: MessageRea
   }
 
   return (
-    <div className={`flex items-center gap-2 flex-wrap ${className}`}>
+    <div className={cn("flex items-center gap-2 flex-wrap", className)}>
       {reactions.map((reaction) => (
         <Button
           key={reaction.emoji}
-          variant={reaction.reacted ? 'secondary' : 'ghost'}
+          variant="ghost"
           size="sm"
           className={cn(
-            "h-6 px-2 text-sm transition-colors",
+            "h-6 px-2 text-sm transition-colors hover:bg-muted/80",
             reaction.reacted 
-              ? "bg-blue-500/20 hover:bg-blue-500/30 text-blue-600 dark:text-blue-400" // Blue highlight for user's reactions
-              : "bg-muted hover:bg-muted/80 dark:bg-muted/30 dark:hover:bg-muted/50" // Darker background for other reactions
+              ? "bg-blue-500/20 hover:bg-blue-500/30 text-blue-600 dark:text-blue-400" 
+              : "bg-muted/50 hover:bg-muted/80 dark:bg-muted/30 dark:hover:bg-muted/50"
           )}
           onClick={() => handleReaction({ native: reaction.emoji })}
         >

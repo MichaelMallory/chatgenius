@@ -2,12 +2,30 @@
 
 import { Button } from '@/components/ui/button'
 import { useSupabase } from '@/components/providers/supabase-provider'
-import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { LogIn, LogOut, User } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import type { User as SupabaseUser } from '@supabase/supabase-js'
 
 export function Header() {
-  const { user } = useSupabase()
+  const { supabase } = useSupabase()
+  const [user, setUser] = useState<SupabaseUser | null>(null)
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+    }
+    getUser()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [supabase])
 
   return (
     <header className="border-b">

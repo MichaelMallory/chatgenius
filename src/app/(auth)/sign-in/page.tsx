@@ -1,23 +1,24 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useSupabase } from '@/components/providers/supabase-provider'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { Github } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 
 export default function SignInPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const { supabase } = useSupabase()
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
@@ -31,10 +32,9 @@ export default function SignInPage() {
 
       toast.success('Signed in successfully')
       router.push('/channels/general')
-      router.refresh()
     } catch (error) {
       console.error('Error signing in:', error)
-      toast.error('Failed to sign in. Please check your credentials.')
+      toast.error('Failed to sign in')
     } finally {
       setIsLoading(false)
     }
@@ -45,7 +45,7 @@ export default function SignInPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/channels/general`,
         },
       })
 
@@ -57,22 +57,22 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="container flex h-screen w-screen flex-col items-center justify-center">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl text-center">Sign in</CardTitle>
-          <CardDescription className="text-center">
-            Enter your email and password to sign in
+    <div className="container mx-auto flex items-center justify-center min-h-screen p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Sign In</CardTitle>
+          <CardDescription>
+            Sign in to your account to continue
           </CardDescription>
         </CardHeader>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSignIn}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="m@example.com"
+                placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -88,45 +88,33 @@ export default function SignInPage() {
                 required
               />
             </div>
+          </CardContent>
+          <CardFooter className="flex flex-col space-y-4">
             <Button
               type="submit"
               className="w-full"
               disabled={isLoading}
             >
-              {isLoading ? 'Signing in...' : 'Sign in'}
+              {isLoading ? 'Signing in...' : 'Sign In'}
             </Button>
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t"></div>
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
-                  Or continue with
-                </span>
-              </div>
-            </div>
             <Button
               type="button"
               variant="outline"
               className="w-full"
               onClick={handleGithubSignIn}
+              disabled={isLoading}
             >
-              <Github className="mr-2 h-4 w-4" />
-              GitHub
+              <Github className="w-4 h-4 mr-2" />
+              Sign in with GitHub
             </Button>
-          </CardContent>
+            <p className="text-sm text-center text-muted-foreground">
+              Don't have an account?{' '}
+              <Link href="/sign-up" className="text-primary hover:underline">
+                Sign up
+              </Link>
+            </p>
+          </CardFooter>
         </form>
-        <CardFooter className="flex flex-wrap items-center justify-between gap-2">
-          <div className="text-sm text-muted-foreground">
-            Don&apos;t have an account?{' '}
-            <Link
-              href="/sign-up"
-              className="text-primary underline-offset-4 transition-colors hover:underline"
-            >
-              Sign up
-            </Link>
-          </div>
-        </CardFooter>
       </Card>
     </div>
   )

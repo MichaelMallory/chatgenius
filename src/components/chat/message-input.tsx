@@ -1,14 +1,14 @@
 'use client'
 
-import { useState, useRef, KeyboardEvent } from 'react'
+import { useState, useRef, KeyboardEvent, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Bold, Italic, Code, Send } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSupabase } from '@/components/providers/supabase-provider'
-import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { EmojiPicker } from './emoji-picker'
+import { User } from '@supabase/supabase-js'
 
 interface MessageInputProps {
   channelId: string
@@ -18,8 +18,43 @@ interface MessageInputProps {
 export function MessageInput({ channelId, className }: MessageInputProps) {
   const [content, setContent] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [user, setUser] = useState<User | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const { user } = useSupabase()
+  const { supabase } = useSupabase()
+
+  // Get and track auth state
+  useEffect(() => {
+    let mounted = true
+    
+    const setupAuth = async () => {
+      try {
+        // Get initial auth state
+        const { data: { session } } = await supabase.auth.getSession()
+        if (mounted) {
+          setUser(session?.user ?? null)
+        }
+
+        // Subscribe to auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+          if (mounted) {
+            setUser(session?.user ?? null)
+          }
+        })
+
+        return () => {
+          mounted = false
+          subscription.unsubscribe()
+        }
+      } catch (error) {
+        console.error('Error setting up auth:', error)
+        return () => {
+          mounted = false
+        }
+      }
+    }
+
+    setupAuth()
+  }, [supabase])
 
   const handleFormat = (format: 'bold' | 'italic' | 'code') => {
     if (!textareaRef.current) return
@@ -66,62 +101,60 @@ export function MessageInput({ channelId, className }: MessageInputProps) {
   }
 
   const handleSubmit = async () => {
-    if (!content.trim() || !user || isSubmitting) {
-      console.log('Submit validation failed:', { 
-        hasContent: !!content.trim(), 
-        hasUser: !!user, 
-        isSubmitting,
-        userId: user?.id,
-        channelId
-      })
+    if (!content.trim()) return
+    if (!user) {
+      toast.error('You must be logged in to send messages')
       return
     }
+    if (isSubmitting) return
 
     setIsSubmitting(true)
     try {
       // First verify channel membership
       const { data: membership, error: membershipError } = await supabase
         .from('user_channels')
-        .select('*')
+        .select('role')
         .eq('user_id', user.id)
         .eq('channel_id', channelId)
         .single()
 
-      console.log('Channel membership check:', { membership, error: membershipError })
-
       if (membershipError) {
-        throw new Error('You are not a member of this channel')
+        if (membershipError.code === 'PGRST116') {
+          toast.error('You are not a member of this channel')
+        } else {
+          console.error('Error checking channel membership:', membershipError)
+          toast.error('Failed to verify channel membership')
+        }
+        return
       }
 
-      console.log('Attempting to send message:', {
-        content: content.trim(),
-        channel_id: channelId,
-        user_id: user.id
-      })
-
-      const { data, error } = await supabase
+      const { error: messageError } = await supabase
         .from('messages')
         .insert({
           content: content.trim(),
           channel_id: channelId,
           user_id: user.id
         })
-        .select()
-        .single()
 
-      if (error) {
-        console.error('Supabase error:', error)
-        throw error
+      if (messageError) {
+        if (messageError.code === '42501') {
+          toast.error('You don\'t have permission to send messages in this channel')
+        } else if (messageError.code === '23503') {
+          toast.error('Channel not found')
+        } else {
+          console.error('Error sending message:', messageError)
+          toast.error('Failed to send message')
+        }
+        return
       }
 
-      console.log('Message sent successfully:', data)
       setContent('')
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto'
       }
     } catch (error) {
       console.error('Error sending message:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to send message. Please try again.')
+      toast.error('Failed to send message')
     } finally {
       setIsSubmitting(false)
     }
@@ -132,6 +165,14 @@ export function MessageInput({ channelId, className }: MessageInputProps) {
       e.preventDefault()
       handleSubmit()
     }
+  }
+
+  if (!user) {
+    return (
+      <div className={cn("p-4 text-center text-muted-foreground", className)}>
+        You must be logged in to send messages
+      </div>
+    )
   }
 
   return (

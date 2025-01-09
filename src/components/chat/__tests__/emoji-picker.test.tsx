@@ -1,10 +1,10 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { EmojiPicker } from '../emoji-picker'
 import { ThemeProvider } from 'next-themes'
+import { vi } from 'vitest'
 
 // Mock emoji-mart components
-jest.mock('@emoji-mart/react', () => ({
-  __esModule: true,
+vi.mock('@emoji-mart/react', () => ({
   default: ({ onEmojiSelect }: { onEmojiSelect: (emoji: any) => void }) => (
     <div data-testid="emoji-picker">
       <button onClick={() => onEmojiSelect({ native: '😊' })}>Select Emoji</button>
@@ -13,7 +13,7 @@ jest.mock('@emoji-mart/react', () => ({
 }))
 
 describe('EmojiPicker', () => {
-  const mockOnEmojiSelect = jest.fn()
+  const mockOnEmojiSelect = vi.fn()
 
   beforeEach(() => {
     mockOnEmojiSelect.mockClear()

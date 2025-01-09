@@ -4,17 +4,30 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { MessageList } from '@/components/chat/message-list'
 import { MessageInput } from '@/components/chat/message-input'
-import { useSupabase } from '@/components/providers/supabase-provider'
+import { useSupabase } from '@/lib/hooks/use-supabase'
 import { Button } from '@/components/ui/button'
 import { Loader2, RefreshCcw } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
-const GENERAL_CHANNEL_ID = '00000000-0000-0000-0000-000000000000'
+interface Channel {
+  id: string;
+  name: string;
+  description: string | null;
+  created_by: string;
+  is_private: boolean;
+}
 
-export default function GeneralChannelPage() {
+interface PageProps {
+  params: {
+    channelId: string;
+  };
+}
+
+export default function ChannelPage({ params }: PageProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [channel, setChannel] = useState<Channel | null>(null)
   const { supabase } = useSupabase()
   const router = useRouter()
 
@@ -32,52 +45,64 @@ export default function GeneralChannelPage() {
           return
         }
 
-        // Check if general channel exists and user has access
-        const { data: channel, error: channelError } = await supabase
+        // Check if channel exists and user has access
+        const { data: channelData, error: channelError } = await supabase
           .from('channels')
           .select('*')
-          .eq('id', GENERAL_CHANNEL_ID)
+          .eq('id', params.channelId)
           .single()
 
         if (channelError) {
-          console.error('Error fetching general channel:', channelError)
-          throw new Error('Unable to access the general channel')
+          console.error('Error fetching channel:', channelError)
+          throw new Error('Unable to access this channel')
         }
 
-        // Check/create user membership
-        const { data: membership, error: membershipError } = await supabase
-          .from('user_channels')
-          .select('*')
-          .eq('channel_id', GENERAL_CHANNEL_ID)
-          .eq('user_id', user.id)
-          .single()
+        setChannel(channelData)
 
-        if (membershipError) {
-          // User is not a member, try to join
-          const { error: joinError } = await supabase
+        // For private channels, check membership
+        if (channelData.is_private) {
+          const { data: membership, error: membershipError } = await supabase
             .from('user_channels')
-            .insert({
-              channel_id: GENERAL_CHANNEL_ID,
-              user_id: user.id,
-              role: 'member'
-            })
+            .select('*')
+            .eq('channel_id', params.channelId)
+            .eq('user_id', user.id)
+            .single()
 
-          if (joinError) {
-            console.error('Error joining channel:', joinError)
-            throw new Error('Failed to join the general channel')
+          if (membershipError) {
+            throw new Error('This is a private channel. You need an invitation to join.')
+          }
+        } else {
+          // For public channels, ensure membership exists but don't block access
+          const { data: membership, error: membershipError } = await supabase
+            .from('user_channels')
+            .select('*')
+            .eq('channel_id', params.channelId)
+            .eq('user_id', user.id)
+            .single()
+
+          if (membershipError) {
+            // Silently create membership for public channels
+            await supabase
+              .from('user_channels')
+              .insert({
+                channel_id: params.channelId,
+                user_id: user.id,
+                role: 'member'
+              })
+              .single()
           }
         }
       } catch (err) {
         console.error('Error in checkAccess:', err)
         setError(err instanceof Error ? err.message : 'An error occurred')
-        toast.error('Failed to access the general channel')
+        toast.error('Failed to access the channel')
       } finally {
         setIsLoading(false)
       }
     }
 
     checkAccess()
-  }, [supabase, router])
+  }, [supabase, router, params.channelId])
 
   if (error) {
     return (
@@ -107,7 +132,7 @@ export default function GeneralChannelPage() {
     )
   }
 
-  if (isLoading) {
+  if (isLoading || !channel) {
     return (
       <div className="container mx-auto p-8">
         <Card className="min-h-[calc(100vh-8rem)]">
@@ -124,13 +149,16 @@ export default function GeneralChannelPage() {
     <div className="container mx-auto p-8">
       <Card className="min-h-[calc(100vh-8rem)]">
         <CardHeader>
-          <CardTitle>General Channel</CardTitle>
+          <CardTitle>{channel.name}</CardTitle>
+          {channel.description && (
+            <p className="text-sm text-muted-foreground">{channel.description}</p>
+          )}
         </CardHeader>
         <CardContent className="flex flex-col h-[calc(100vh-12rem)]">
           <div className="flex-1 overflow-y-auto">
-            <MessageList channelId={GENERAL_CHANNEL_ID} />
+            <MessageList channelId={params.channelId} />
           </div>
-          <MessageInput channelId={GENERAL_CHANNEL_ID} className="pt-4" />
+          <MessageInput channelId={params.channelId} className="pt-4" />
         </CardContent>
       </Card>
     </div>
