@@ -21,6 +21,15 @@ jest.mock('@/lib/supabase', () => ({
   },
 }))
 
+// Mock MessageReactions component
+jest.mock('../message-reactions', () => ({
+  MessageReactions: ({ messageId, channelId }: { messageId: string, channelId: string }) => (
+    <div data-testid="message-reactions" data-message-id={messageId} data-channel-id={channelId}>
+      Message Reactions
+    </div>
+  ),
+}))
+
 describe('Message', () => {
   const mockMessage = {
     id: 'msg-1',
@@ -197,5 +206,77 @@ describe('Message', () => {
 
     expect(onDelete).not.toHaveBeenCalled()
     expect(screen.getByText(mockMessage.content)).toBeInTheDocument()
+  })
+
+  it('renders message reactions component', () => {
+    render(
+      <Message
+        id={mockMessage.id}
+        content={mockMessage.content}
+        username={mockMessage.username}
+        avatarUrl={mockMessage.avatarUrl}
+        createdAt={mockMessage.createdAt}
+        userId={mockMessage.userId}
+        channelId={mockMessage.channelId}
+      />
+    )
+
+    const reactionsComponent = screen.getByTestId('message-reactions')
+    expect(reactionsComponent).toBeInTheDocument()
+    expect(reactionsComponent).toHaveAttribute('data-message-id', mockMessage.id)
+    expect(reactionsComponent).toHaveAttribute('data-channel-id', mockMessage.channelId)
+  })
+
+  it('aligns reactions to the right for current user\'s messages', () => {
+    render(
+      <Message
+        id={mockMessage.id}
+        content={mockMessage.content}
+        username={mockMessage.username}
+        avatarUrl={mockMessage.avatarUrl}
+        createdAt={mockMessage.createdAt}
+        userId={mockCurrentUser.id}
+        channelId={mockMessage.channelId}
+      />
+    )
+
+    const reactionsComponent = screen.getByTestId('message-reactions')
+    expect(reactionsComponent.parentElement).toHaveClass('text-right')
+  })
+
+  it('aligns reactions to the left for other users\' messages', () => {
+    render(
+      <Message
+        id={mockMessage.id}
+        content={mockMessage.content}
+        username={mockMessage.username}
+        avatarUrl={mockMessage.avatarUrl}
+        createdAt={mockMessage.createdAt}
+        userId="different-user"
+        channelId={mockMessage.channelId}
+      />
+    )
+
+    const reactionsComponent = screen.getByTestId('message-reactions')
+    expect(reactionsComponent.parentElement).not.toHaveClass('text-right')
+  })
+
+  it('does not show reactions when editing message', () => {
+    render(
+      <Message
+        id={mockMessage.id}
+        content={mockMessage.content}
+        username={mockMessage.username}
+        avatarUrl={mockMessage.avatarUrl}
+        createdAt={mockMessage.createdAt}
+        userId={mockCurrentUser.id}
+        channelId={mockMessage.channelId}
+      />
+    )
+
+    // Enter edit mode
+    fireEvent.click(screen.getByTitle('Edit message'))
+
+    expect(screen.queryByTestId('message-reactions')).not.toBeInTheDocument()
   })
 }) 

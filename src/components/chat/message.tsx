@@ -12,6 +12,7 @@ import { Pencil, Trash2, X, Check } from 'lucide-react'
 import { useSupabase } from '@/components/providers/supabase-provider'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { MessageReactions } from './message-reactions'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -180,6 +181,14 @@ export function Message({
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {content}
             </ReactMarkdown>
+            <MessageReactions
+              messageId={id}
+              channelId={channelId}
+              className={cn(
+                "mt-2",
+                isCurrentUser && "justify-end"
+              )}
+            />
           </div>
         )}
       </div>

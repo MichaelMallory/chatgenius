@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { RealtimeChannel, RealtimePostgresChangesPayload, SupabaseClient } from '@supabase/supabase-js'
+import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 
 type Table = 'messages' | 'channels' | 'reactions' | 'user_channels' | 'files' | 'profiles'
@@ -21,26 +21,42 @@ export function useRealtime<T extends { [key: string]: any }>(
     let channel: RealtimeChannel
 
     try {
-      // @ts-ignore - Known type mismatch in Supabase types
+      console.log(`Setting up real-time subscription for ${table}:`, {
+        event,
+        filter,
+        schema
+      })
+
       channel = supabase
         .channel(`${table}_changes`)
-        .on(
-          'postgres_changes',
+        .on<T>(
+          'postgres_changes' as any,
           {
             event,
             schema,
             table,
             filter,
           },
-          callback
+          (payload: RealtimePostgresChangesPayload<T>) => {
+            console.log(`Received ${table} update:`, {
+              eventType: payload.eventType,
+              new: payload.new,
+              old: payload.old,
+              filter
+            })
+            callback(payload)
+          }
         )
-        .subscribe()
+        .subscribe((status) => {
+          console.log(`Subscription status for ${table}:`, status)
+        })
     } catch (error) {
       console.error(`Error subscribing to ${table}:`, error)
     }
 
     return () => {
       if (channel) {
+        console.log(`Cleaning up subscription for ${table}`)
         supabase.removeChannel(channel)
       }
     }
