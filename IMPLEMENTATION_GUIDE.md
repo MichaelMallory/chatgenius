@@ -164,7 +164,16 @@
     - Created comprehensive test suite covering all permission scenarios
     - Ensured immediate access to public channels for all users
     - Set up creator as admin when creating channels
-  - [ ] Direct message support
+  - [x] Direct message support
+    - Implemented listing of all users under direct messages section
+    - Added automatic channel creation when starting a DM
+    - Created database triggers for cleaning up orphaned DM channels
+    - Added proper RLS policies for DM access
+    - Implemented real-time updates for DM list
+    - Added proper error handling and loading states
+    - Fixed issues with recreated users and DM channels
+    - Added "Chat with <username>" title format for DMs
+    - Implemented auto-scrolling to latest messages
 - [ ] User management in channels
   - [ ] Invite system
   - [ ] Member management

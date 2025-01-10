@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Message } from './message'
 import { useRealtime } from '@/lib/hooks/use-realtime'
 import { useSupabase } from '@/components/providers/supabase-provider'
@@ -24,7 +24,12 @@ interface MessageListProps {
 
 export function MessageList({ channelId }: MessageListProps) {
   const [messages, setMessages] = useState<MessageData[]>([])
-  const { user } = useSupabase()
+  const { supabase } = useSupabase()
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
 
   // Initial message load
   useEffect(() => {
@@ -53,9 +58,16 @@ export function MessageList({ channelId }: MessageListProps) {
       }
 
       setMessages(data || [])
+      // Scroll to bottom after messages load
+      setTimeout(scrollToBottom, 100)
     }
 
     loadMessages()
+  }, [channelId])
+
+  // Scroll to bottom when channel changes
+  useEffect(() => {
+    scrollToBottom()
   }, [channelId])
 
   // Real-time message subscription
@@ -90,6 +102,8 @@ export function MessageList({ channelId }: MessageListProps) {
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         )
       })
+      // Scroll to bottom when new message arrives
+      setTimeout(scrollToBottom, 100)
     } else if (payload.eventType === 'DELETE' && payload.old.channel_id === channelId) {
       setMessages((prev) => prev.filter((msg) => msg.id !== payload.old.id))
     } else if (payload.eventType === 'UPDATE' && payload.new.channel_id === channelId) {
@@ -120,6 +134,7 @@ export function MessageList({ channelId }: MessageListProps) {
           onDelete={handleDelete}
         />
       ))}
+      <div ref={messagesEndRef} />
     </div>
   )
 } 

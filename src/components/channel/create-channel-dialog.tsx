@@ -1,5 +1,6 @@
 import React from 'react';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,8 +19,17 @@ import {
 import { useSupabase } from '@/lib/hooks/use-supabase';
 import { toast } from 'sonner';
 
+interface Channel {
+  id: string;
+  name: string;
+  description: string | null;
+  created_by: string;
+  is_private: boolean;
+  is_direct_message: boolean;
+}
+
 interface CreateChannelDialogProps {
-  onChannelCreated?: () => void;
+  onChannelCreated?: (channel: Channel) => void;
 }
 
 export const CreateChannelDialog: React.FC<CreateChannelDialogProps> = ({ onChannelCreated }) => {
@@ -28,6 +38,7 @@ export const CreateChannelDialog: React.FC<CreateChannelDialogProps> = ({ onChan
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const { supabase } = useSupabase();
+  const router = useRouter();
 
   const handleCreateChannel = async () => {
     if (!name.trim()) {
@@ -45,15 +56,23 @@ export const CreateChannelDialog: React.FC<CreateChannelDialogProps> = ({ onChan
       const { data: channel, error: channelError } = await supabase
         .from('channels')
         .insert({
-          name: name.trim(),
+          name: name.trim().toLowerCase().replace(/\s+/g, '-'),
           description: description.trim(),
           created_by: user.id,
           is_private: false,
+          is_direct_message: false
         })
         .select()
         .single();
 
-      if (channelError) throw channelError;
+      if (channelError) {
+        if (channelError.code === '23505') {
+          toast.error('A channel with this name already exists');
+        } else {
+          throw channelError;
+        }
+        return;
+      }
 
       // Add creator as a member with 'admin' role
       const { error: membershipError } = await supabase
@@ -68,9 +87,12 @@ export const CreateChannelDialog: React.FC<CreateChannelDialogProps> = ({ onChan
 
       toast.success('Channel created successfully');
       setIsOpen(false);
-      onChannelCreated?.();
+      onChannelCreated?.(channel);
       setName('');
       setDescription('');
+      
+      // Navigate to the new channel
+      router.push(`/channels/${channel.id}`);
     } catch (error) {
       console.error('Error creating channel:', error);
       toast.error('Failed to create channel');
@@ -82,7 +104,14 @@ export const CreateChannelDialog: React.FC<CreateChannelDialogProps> = ({ onChan
   return (
     <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
       <AlertDialogTrigger asChild>
-        <Button variant="outline">Create Channel</Button>
+        <Button 
+          id="create-channel-trigger"
+          variant="ghost" 
+          size="sm" 
+          className="hidden"
+        >
+          Create Channel
+        </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>

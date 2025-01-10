@@ -1,6 +1,6 @@
 'use client'
 
-import { ChannelList } from '@/components/channel/channel-list'
+import { Sidebar } from '@/components/layout/sidebar'
 import { Separator } from '@/components/ui/separator'
 
 interface LayoutProps {
@@ -10,10 +10,8 @@ interface LayoutProps {
 export default function ChannelsLayout({ children }: LayoutProps) {
   return (
     <div className="flex h-screen">
-      <div className="w-64 border-r bg-muted/50">
-        <ChannelList />
-      </div>
-      <Separator orientation="vertical" />
+      <Sidebar />
+      <Separator orientation="vertical" className="h-screen" />
       <div className="flex-1">
         {children}
       </div>

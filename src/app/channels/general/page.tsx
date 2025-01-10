@@ -32,33 +32,21 @@ export default function GeneralChannelPage() {
           return
         }
 
-        // Check if general channel exists and user has access
-        const { data: channel, error: channelError } = await supabase
-          .from('channels')
-          .select('*')
-          .eq('id', GENERAL_CHANNEL_ID)
-          .single()
-
-        if (channelError) {
-          console.error('Error fetching general channel:', channelError)
-          throw new Error('Unable to access the general channel')
-        }
-
-        // Check/create user membership
-        const { data: membership, error: membershipError } = await supabase
+        // First check if user is already a member
+        const { data: membership, error: membershipCheckError } = await supabase
           .from('user_channels')
           .select('*')
           .eq('channel_id', GENERAL_CHANNEL_ID)
           .eq('user_id', user.id)
           .single()
 
-        if (membershipError) {
+        if (!membership && !membershipCheckError) {
           // User is not a member, try to join
           const { error: joinError } = await supabase
             .from('user_channels')
             .insert({
-              channel_id: GENERAL_CHANNEL_ID,
               user_id: user.id,
+              channel_id: GENERAL_CHANNEL_ID,
               role: 'member'
             })
 
@@ -67,6 +55,7 @@ export default function GeneralChannelPage() {
             throw new Error('Failed to join the general channel')
           }
         }
+
       } catch (err) {
         console.error('Error in checkAccess:', err)
         setError(err instanceof Error ? err.message : 'An error occurred')

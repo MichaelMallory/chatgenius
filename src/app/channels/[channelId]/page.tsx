@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Loader2, RefreshCcw } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { use } from 'react'
 
 interface Channel {
   id: string;
@@ -16,18 +17,27 @@ interface Channel {
   description: string | null;
   created_by: string;
   is_private: boolean;
+  is_direct_message: boolean;
+  participants?: string[];
+}
+
+interface Profile {
+  id: string;
+  username: string;
 }
 
 interface PageProps {
-  params: {
+  params: Promise<{
     channelId: string;
-  };
+  }>;
 }
 
 export default function ChannelPage({ params }: PageProps) {
+  const resolvedParams = use(params);
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [channel, setChannel] = useState<Channel | null>(null)
+  const [otherUser, setOtherUser] = useState<Profile | null>(null)
   const { supabase } = useSupabase()
   const router = useRouter()
 
@@ -48,8 +58,8 @@ export default function ChannelPage({ params }: PageProps) {
         // Check if channel exists and user has access
         const { data: channelData, error: channelError } = await supabase
           .from('channels')
-          .select('*')
-          .eq('id', params.channelId)
+          .select('*, participants')
+          .eq('id', resolvedParams.channelId)
           .single()
 
         if (channelError) {
@@ -59,12 +69,30 @@ export default function ChannelPage({ params }: PageProps) {
 
         setChannel(channelData)
 
+        // If it's a DM channel, fetch the other user's profile
+        if (channelData.is_direct_message && channelData.participants) {
+          const otherUserId = channelData.participants.find((id: string) => id !== user.id);
+          if (otherUserId) {
+            const { data: profileData, error: profileError } = await supabase
+              .from('profiles')
+              .select('id, username')
+              .eq('id', otherUserId)
+              .single();
+
+            if (profileError) {
+              console.error('Error fetching profile:', profileError);
+            } else {
+              setOtherUser(profileData);
+            }
+          }
+        }
+
         // For private channels, check membership
         if (channelData.is_private) {
           const { data: membership, error: membershipError } = await supabase
             .from('user_channels')
             .select('*')
-            .eq('channel_id', params.channelId)
+            .eq('channel_id', resolvedParams.channelId)
             .eq('user_id', user.id)
             .single()
 
@@ -76,7 +104,7 @@ export default function ChannelPage({ params }: PageProps) {
           const { data: membership, error: membershipError } = await supabase
             .from('user_channels')
             .select('*')
-            .eq('channel_id', params.channelId)
+            .eq('channel_id', resolvedParams.channelId)
             .eq('user_id', user.id)
             .single()
 
@@ -85,7 +113,7 @@ export default function ChannelPage({ params }: PageProps) {
             await supabase
               .from('user_channels')
               .insert({
-                channel_id: params.channelId,
+                channel_id: resolvedParams.channelId,
                 user_id: user.id,
                 role: 'member'
               })
@@ -102,7 +130,15 @@ export default function ChannelPage({ params }: PageProps) {
     }
 
     checkAccess()
-  }, [supabase, router, params.channelId])
+  }, [supabase, router, resolvedParams.channelId])
+
+  const getChannelTitle = () => {
+    if (!channel) return '';
+    if (channel.is_direct_message) {
+      return otherUser ? `Chat with ${otherUser.username}` : 'Direct Message';
+    }
+    return channel.name;
+  };
 
   if (error) {
     return (
@@ -149,16 +185,16 @@ export default function ChannelPage({ params }: PageProps) {
     <div className="container mx-auto p-8">
       <Card className="min-h-[calc(100vh-8rem)]">
         <CardHeader>
-          <CardTitle>{channel.name}</CardTitle>
-          {channel.description && (
+          <CardTitle>{getChannelTitle()}</CardTitle>
+          {!channel.is_direct_message && channel.description && (
             <p className="text-sm text-muted-foreground">{channel.description}</p>
           )}
         </CardHeader>
         <CardContent className="flex flex-col h-[calc(100vh-12rem)]">
           <div className="flex-1 overflow-y-auto">
-            <MessageList channelId={params.channelId} />
+            <MessageList channelId={resolvedParams.channelId} />
           </div>
-          <MessageInput channelId={params.channelId} className="pt-4" />
+          <MessageInput channelId={resolvedParams.channelId} className="pt-4" />
         </CardContent>
       </Card>
     </div>
