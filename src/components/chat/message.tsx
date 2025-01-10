@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import Link from 'next/link'
 
 interface MessageProps {
   id: string
@@ -125,13 +126,17 @@ export function Message({
       "flex gap-3 p-4 hover:bg-muted/50 transition-colors group",
       className
     )}>
-      <Avatar className="h-8 w-8">
-        <AvatarImage src={avatarUrl} />
-        <AvatarFallback>{username[0].toUpperCase()}</AvatarFallback>
-      </Avatar>
+      <Link href={`/users/${userId}`} className="hover:opacity-80 transition-opacity">
+        <Avatar className="h-8 w-8">
+          <AvatarImage src={avatarUrl} />
+          <AvatarFallback>{username[0].toUpperCase()}</AvatarFallback>
+        </Avatar>
+      </Link>
       <div className="flex flex-col gap-1 flex-1">
         <div className="flex items-center gap-2">
-          <span className="font-medium">{username}</span>
+          <Link href={`/users/${userId}`} className="hover:underline">
+            <span className="font-medium">{username}</span>
+          </Link>
           <span className="text-xs text-muted-foreground">
             {formatDistanceToNow(createdAt, { addSuffix: true })}
           </span>

@@ -88,6 +88,14 @@
     - Improved avatar fallback visibility in dark theme
     - Added file type and size validation (max 5MB)
     - Implemented optimistic updates for better UX
+  - [x] Implement user status system
+    - Added status field to profiles table with proper RLS policies
+    - Created user profile page with status editing
+    - Added real-time status updates with optimistic UI
+    - Created public user profile view at /users/[userId]
+    - Made avatars clickable in messages and DM list to view profiles
+    - Removed unnecessary full name field for cleaner UI
+    - Added proper loading states and error handling
   - [x] Implement OAuth providers
     - Added GitHub OAuth integration
     - Added Google OAuth integration

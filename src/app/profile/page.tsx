@@ -16,10 +16,11 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<{
     id: string
     username: string
-    full_name: string
     avatar_url: string | null
+    status: string | null
   } | null>(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [isSavingStatus, setIsSavingStatus] = useState(false)
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -28,7 +29,7 @@ export default function ProfilePage() {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, username, full_name, avatar_url')
+        .select('id, username, avatar_url, status')
         .eq('id', user.id)
         .single()
 
@@ -196,12 +197,40 @@ export default function ProfilePage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="full-name">Full Name</Label>
-              <Input
-                id="full-name"
-                value={profile.full_name}
-                disabled
-              />
+              <Label htmlFor="status">Status</Label>
+              <div className="flex space-x-2">
+                <Input
+                  id="status"
+                  value={profile.status || ''}
+                  onChange={async (e) => {
+                    const newStatus = e.target.value
+                    setProfile(prev => prev ? { ...prev, status: newStatus } : null)
+                    
+                    setIsSavingStatus(true)
+                    try {
+                      const { error } = await supabase
+                        .from('profiles')
+                        .update({ 
+                          status: newStatus,
+                          updated_at: new Date().toISOString()
+                        })
+                        .eq('id', profile.id)
+
+                      if (error) throw error
+                      toast.success('Status updated')
+                    } catch (error) {
+                      console.error('Error updating status:', error)
+                      toast.error('Failed to update status')
+                    } finally {
+                      setIsSavingStatus(false)
+                    }
+                  }}
+                  placeholder="What's on your mind?"
+                />
+                {isSavingStatus && (
+                  <Loader2 className="h-4 w-4 animate-spin mt-2" />
+                )}
+              </div>
             </div>
           </div>
         </CardContent>

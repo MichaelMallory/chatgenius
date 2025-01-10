@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { PresenceIndicator } from '@/components/ui/presence-indicator';
+import Link from 'next/link';
 
 interface Profile {
   id: string;
@@ -147,10 +148,12 @@ export function DirectMessageList() {
         >
           <div className="flex items-center space-x-2 w-full">
             <div className="relative">
-              <Avatar className="h-6 w-6">
-                <AvatarImage src={user.avatar_url || undefined} />
-                <AvatarFallback className="bg-slate-700 text-slate-200">{user.username[0].toUpperCase()}</AvatarFallback>
-              </Avatar>
+              <Link href={`/users/${user.id}`} className="hover:opacity-80 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                <Avatar className="h-6 w-6">
+                  <AvatarImage src={user.avatar_url || undefined} />
+                  <AvatarFallback className="bg-slate-700 text-slate-200">{user.username[0].toUpperCase()}</AvatarFallback>
+                </Avatar>
+              </Link>
               <PresenceIndicator userId={user.id} />
             </div>
             <span className="truncate">{user.username}</span>
