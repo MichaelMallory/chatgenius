@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Pencil, Trash2, X, Check } from 'lucide-react'
+import { Pencil, Trash2, X, Check, MessageSquare } from 'lucide-react'
 import { useSupabase } from '@/components/providers/supabase-provider'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
@@ -34,6 +34,7 @@ interface MessageProps {
   userId: string
   channelId: string
   onDelete?: (messageId: string) => void
+  onReply?: (messageId: string) => void
 }
 
 export function Message({ 
@@ -44,12 +45,42 @@ export function Message({
   createdAt,
   userId,
   channelId,
-  onDelete
+  onDelete,
+  onReply
 }: MessageProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editedContent, setEditedContent] = useState(content)
-  const { user } = useSupabase()
-  const isCurrentUser = user?.id === userId
+  const [replyCount, setReplyCount] = useState(0)
+  const { supabase } = useSupabase()
+  const [currentUser, setCurrentUser] = useState<string | null>(null)
+  const isCurrentUser = currentUser === userId
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setCurrentUser(user?.id ?? null)
+    }
+    getUser()
+  }, [supabase])
+
+  // Load reply count
+  useEffect(() => {
+    const loadReplyCount = async () => {
+      const { count, error } = await supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('parent_id', id)
+
+      if (error) {
+        console.error('Error loading reply count:', error)
+        return
+      }
+
+      setReplyCount(count || 0)
+    }
+
+    loadReplyCount()
+  }, [id])
 
   const handleEdit = async () => {
     if (!editedContent.trim()) return
@@ -59,7 +90,7 @@ export function Message({
         .from('messages')
         .update({ content: editedContent.trim() })
         .eq('id', id)
-        .eq('user_id', user?.id)
+        .eq('user_id', currentUser)
 
       if (error) throw error
 
@@ -76,7 +107,7 @@ export function Message({
         .from('messages')
         .delete()
         .eq('id', id)
-        .eq('user_id', user?.id)
+        .eq('user_id', currentUser)
 
       if (error) throw error
 
@@ -181,14 +212,41 @@ export function Message({
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {content}
             </ReactMarkdown>
-            <MessageReactions
-              messageId={id}
-              channelId={channelId}
-              className={cn(
-                "mt-2",
-                isCurrentUser && "justify-end"
-              )}
-            />
+            <div className={cn(
+              "flex items-center gap-2",
+              isCurrentUser && "justify-end"
+            )}>
+              <MessageReactions
+                messageId={id}
+                channelId={channelId}
+                className="mt-2"
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-6 px-2 text-sm opacity-0 group-hover:opacity-100 transition-opacity",
+                  "hover:bg-muted/80 dark:hover:bg-muted/50"
+                )}
+                onClick={() => onReply?.(id)}
+              >
+                <MessageSquare className="h-3 w-3 mr-1" />
+                Reply
+              </Button>
+            </div>
+            {replyCount > 0 && (
+              <Button
+                variant="link"
+                size="sm"
+                className={cn(
+                  "h-6 px-0 text-sm text-muted-foreground hover:text-foreground",
+                  isCurrentUser && "ml-auto"
+                )}
+                onClick={() => onReply?.(id)}
+              >
+                {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
+              </Button>
+            )}
           </div>
         )}
       </div>

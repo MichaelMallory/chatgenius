@@ -13,9 +13,10 @@ import { User } from '@supabase/supabase-js'
 interface MessageInputProps {
   channelId: string
   className?: string
+  parentId?: string
 }
 
-export function MessageInput({ channelId, className }: MessageInputProps) {
+export function MessageInput({ channelId, className, parentId }: MessageInputProps) {
   const [content, setContent] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [user, setUser] = useState<User | null>(null)
@@ -133,7 +134,8 @@ export function MessageInput({ channelId, className }: MessageInputProps) {
         .insert({
           content: content.trim(),
           channel_id: channelId,
-          user_id: user.id
+          user_id: user.id,
+          parent_id: parentId
         })
 
       if (messageError) {

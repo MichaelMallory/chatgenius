@@ -35,8 +35,8 @@ export function ChannelProvider() {
           onConflict: 'user_id,channel_id'
         });
 
-      if (membershipError) {
-        console.error('Error ensuring general channel membership:', membershipError);
+      if (membershipError && Object.keys(membershipError).length > 0) {
+        console.warn('Warning: Issue with general channel membership:', membershipError);
       }
 
       // Fetch all accessible channels
