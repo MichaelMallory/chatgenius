@@ -33,8 +33,9 @@ interface MessageProps {
   createdAt: Date
   userId: string
   channelId: string
+  className?: string
   onDelete?: (messageId: string) => void
-  onReply?: (messageId: string) => void
+  onReply?: (messageId: string, event: React.MouseEvent<HTMLButtonElement>) => void
 }
 
 export function Message({ 
@@ -45,6 +46,7 @@ export function Message({
   createdAt,
   userId,
   channelId,
+  className,
   onDelete,
   onReply
 }: MessageProps) {
@@ -121,16 +123,13 @@ export function Message({
   return (
     <div className={cn(
       "flex gap-3 p-4 hover:bg-muted/50 transition-colors group",
-      isCurrentUser && "flex-row-reverse"
+      className
     )}>
       <Avatar className="h-8 w-8">
         <AvatarImage src={avatarUrl} />
         <AvatarFallback>{username[0].toUpperCase()}</AvatarFallback>
       </Avatar>
-      <div className={cn(
-        "flex flex-col gap-1 flex-1",
-        isCurrentUser && "items-end"
-      )}>
+      <div className="flex flex-col gap-1 flex-1">
         <div className="flex items-center gap-2">
           <span className="font-medium">{username}</span>
           <span className="text-xs text-muted-foreground">
@@ -205,17 +204,11 @@ export function Message({
             </div>
           </div>
         ) : (
-          <div className={cn(
-            "text-sm prose prose-sm dark:prose-invert max-w-none",
-            isCurrentUser && "text-right"
-          )}>
+          <div className="text-sm prose prose-sm dark:prose-invert max-w-none">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {content}
             </ReactMarkdown>
-            <div className={cn(
-              "flex items-center gap-2",
-              isCurrentUser && "justify-end"
-            )}>
+            <div className="flex items-center gap-2">
               <MessageReactions
                 messageId={id}
                 channelId={channelId}
@@ -228,7 +221,7 @@ export function Message({
                   "h-6 px-2 text-sm opacity-0 group-hover:opacity-100 transition-opacity",
                   "hover:bg-muted/80 dark:hover:bg-muted/50"
                 )}
-                onClick={() => onReply?.(id)}
+                onClick={(e) => onReply?.(id, e)}
               >
                 <MessageSquare className="h-3 w-3 mr-1" />
                 Reply
@@ -238,11 +231,8 @@ export function Message({
               <Button
                 variant="link"
                 size="sm"
-                className={cn(
-                  "h-6 px-0 text-sm text-muted-foreground hover:text-foreground",
-                  isCurrentUser && "ml-auto"
-                )}
-                onClick={() => onReply?.(id)}
+                className="h-6 px-0 text-sm text-muted-foreground hover:text-foreground"
+                onClick={(e) => onReply?.(id, e)}
               >
                 {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
               </Button>

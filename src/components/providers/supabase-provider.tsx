@@ -1,77 +1,90 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
-import { createClient, SupabaseClient, User } from '@supabase/supabase-js'
-import { Database } from '@/lib/database.types'
+import { User } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
+import { Loader2 } from 'lucide-react'
 
 interface SupabaseContextType {
-  supabase: SupabaseClient<Database>
+  supabase: typeof supabase
   user: User | null
+  isLoading: boolean
 }
 
-export const SupabaseContext = createContext<SupabaseContextType | undefined>(undefined)
+export const SupabaseContext = createContext<SupabaseContextType>({
+  supabase,
+  user: null,
+  isLoading: true,
+})
 
 export function useSupabase() {
-  const context = useContext(SupabaseContext)
-  if (context === undefined) {
-    throw new Error('useSupabase must be used within a SupabaseProvider')
-  }
-  return context
+  return useContext(SupabaseContext)
 }
 
-const SupabaseProvider = ({ children }: { children: React.ReactNode }) => {
-  const [supabase] = useState(() => 
-    createClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true,
-        },
-      }
-    )
-  )
+export default function SupabaseProvider({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
+    let mounted = true
+
     // Check active session
     const checkSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
         if (error) throw error
-        setUser(session?.user ?? null)
+        if (mounted) {
+          setUser(session?.user ?? null)
+          setIsLoading(false)
+        }
       } catch (error) {
         console.error('Error checking session:', error)
-        setUser(null)
+        if (mounted) {
+          setUser(null)
+          setIsLoading(false)
+        }
       }
     }
+
     checkSession()
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setUser(session?.user ?? null)
-      if (event === 'SIGNED_OUT') {
-        router.push('/sign-in')
-      }
-      if (event === 'SIGNED_IN') {
-        router.refresh()
+      if (mounted) {
+        setUser(session?.user ?? null)
+        
+        if (event === 'SIGNED_OUT') {
+          router.push('/sign-in')
+        }
+        if (event === 'SIGNED_IN') {
+          router.refresh()
+        }
       }
     })
 
     return () => {
+      mounted = false
       subscription.unsubscribe()
     }
-  }, [supabase, router])
+  }, [router])
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
 
   return (
-    <SupabaseContext.Provider value={{ supabase, user }}>
+    <SupabaseContext.Provider value={{ supabase, user, isLoading }}>
       {children}
     </SupabaseContext.Provider>
   )
-}
-
-export default SupabaseProvider 
+} 

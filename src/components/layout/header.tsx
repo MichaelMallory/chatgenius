@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { PresenceIndicator } from '@/components/ui/presence-indicator'
 
 interface Profile {
   username: string;
@@ -151,10 +152,13 @@ export function Header() {
                 className="space-x-2"
               >
                 <Link href="/profile">
-                  <Avatar className="h-6 w-6">
-                    <AvatarImage src={profile?.avatar_url || undefined} />
-                    <AvatarFallback>{profile?.username?.[0].toUpperCase()}</AvatarFallback>
-                  </Avatar>
+                  <div className="relative">
+                    <Avatar className="h-6 w-6">
+                      <AvatarImage src={profile?.avatar_url || undefined} />
+                      <AvatarFallback>{profile?.username?.[0].toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    {user && <PresenceIndicator userId={user.id} />}
+                  </div>
                   <span>Profile</span>
                 </Link>
               </Button>

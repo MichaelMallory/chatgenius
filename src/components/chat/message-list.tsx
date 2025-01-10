@@ -21,27 +21,42 @@ interface MessageData {
   }
 }
 
+interface ThreadPosition {
+  messageId: string
+  top: number
+  right: number
+}
+
 interface MessageListProps {
   channelId: string
 }
 
 export function MessageList({ channelId }: MessageListProps) {
   const [messages, setMessages] = useState<MessageData[]>([])
-  const [activeThreadId, setActiveThreadId] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [activeThread, setActiveThread] = useState<ThreadPosition | null>(null)
   const [error, setError] = useState<string | null>(null)
   const { supabase, user } = useSupabase()
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messageListRef = useRef<HTMLDivElement>(null)
+  const loadingTimeoutRef = useRef<NodeJS.Timeout>()
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    // First scroll instantly
+    messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+    // Then do a final scroll after a longer delay to catch any late updates
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+      // One final scroll to absolutely ensure we're at the bottom
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+      })
+    }, 1000)
   }
 
   // Initial message load
   useEffect(() => {
     const loadMessages = async () => {
       try {
-        setIsLoading(true)
         setError(null)
 
         if (!user) {
@@ -64,8 +79,8 @@ export function MessageList({ channelId }: MessageListProps) {
             )
           `)
           .eq('channel_id', channelId)
-          .is('parent_id', null)  // Only get top-level messages
-          .order('created_at', { ascending: true })
+          .is('parent_id', null)
+          .order('created_at', { ascending: false })
           .limit(50)
           .returns<MessageData[]>()
 
@@ -75,24 +90,29 @@ export function MessageList({ channelId }: MessageListProps) {
           return
         }
 
-        setMessages(data || [])
-        // Scroll to bottom after messages load
-        setTimeout(scrollToBottom, 100)
+        setMessages((data || []).reverse())
+        
+        // Set a timeout to scroll to bottom after components load
+        if (loadingTimeoutRef.current) {
+          clearTimeout(loadingTimeoutRef.current)
+        }
+        loadingTimeoutRef.current = setTimeout(scrollToBottom, 3000)
+
       } catch (error) {
         console.error('Error loading messages:', error)
         setError('An unexpected error occurred')
-      } finally {
-        setIsLoading(false)
       }
     }
 
     loadMessages()
-  }, [channelId, user, supabase])
 
-  // Scroll to bottom when channel changes
-  useEffect(() => {
-    scrollToBottom()
-  }, [channelId])
+    // Cleanup timeout on unmount or channel change
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current)
+      }
+    }
+  }, [channelId, user, supabase])
 
   // Real-time message subscription
   useRealtime<MessageData>('messages', async (payload) => {
@@ -125,13 +145,11 @@ export function MessageList({ channelId }: MessageListProps) {
       }
 
       setMessages((prev) => {
-        const updated = [...prev, newMessage]
-        return updated.sort((a, b) => 
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        )
+        // Add new message at the end since it's the newest
+        return [...prev, newMessage]
       })
       // Scroll to bottom when new message arrives
-      setTimeout(scrollToBottom, 100)
+      scrollToBottom()
     } else if (payload.eventType === 'DELETE' && payload.old.channel_id === channelId) {
       setMessages((prev) => prev.filter((msg) => msg.id !== payload.old.id))
     } else if (payload.eventType === 'UPDATE' && payload.new.channel_id === channelId) {
@@ -147,8 +165,25 @@ export function MessageList({ channelId }: MessageListProps) {
     setMessages((prev) => prev.filter((msg) => msg.id !== messageId))
   }
 
-  const handleReply = (messageId: string) => {
-    setActiveThreadId(messageId)
+  const handleReply = (messageId: string, event: React.MouseEvent<HTMLButtonElement>) => {
+    const messageElement = event.currentTarget.closest('.message-item')
+    if (!messageElement) return
+
+    const listRect = messageListRef.current?.getBoundingClientRect()
+    if (!listRect) return
+
+    // If clicking the same thread, close it
+    if (activeThread?.messageId === messageId) {
+      setActiveThread(null)
+      return
+    }
+
+    // Calculate position relative to the viewport
+    const viewportHeight = window.innerHeight
+    const threadHeight = Math.min(viewportHeight - 100, 600) // Max height of thread view
+    const top = Math.max(20, (viewportHeight - threadHeight) / 2) // Center in viewport with min padding
+
+    setActiveThread({ messageId, top, right: listRect.width })
   }
 
   if (error) {
@@ -159,20 +194,10 @@ export function MessageList({ channelId }: MessageListProps) {
     )
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
-    )
-  }
-
   return (
-    <div className="flex h-full">
-      <div className={cn(
-        "flex-1 flex flex-col gap-2 p-4",
-        activeThreadId && "border-r"
-      )}>
+    <div className="flex h-full relative" ref={messageListRef}>
+      <div className="flex-1 flex flex-col gap-2 p-4 relative overflow-y-auto">
+        <div className="flex-1" /> {/* Spacer to push messages to bottom */}
         {messages.map((message) => (
           <Message
             key={message.id}
@@ -185,16 +210,30 @@ export function MessageList({ channelId }: MessageListProps) {
             channelId={message.channel_id}
             onDelete={handleDelete}
             onReply={handleReply}
+            className="message-item"
           />
         ))}
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} className="h-0" />
       </div>
-      {activeThreadId && (
-        <div className="w-[400px]">
+      {activeThread && (
+        <div 
+          className={cn(
+            "fixed w-[400px] bg-background border shadow-lg rounded-lg",
+            "transition-all duration-200 ease-in-out opacity-0 translate-x-2",
+            "data-[state=open]:opacity-100 data-[state=open]:translate-x-0"
+          )}
+          style={{ 
+            top: `${activeThread.top}px`,
+            right: '20px',
+            maxHeight: 'calc(100vh - 100px)',
+            transform: 'translateZ(0)'
+          }}
+          data-state="open"
+        >
           <ThreadView
-            parentMessageId={activeThreadId}
+            parentMessageId={activeThread.messageId}
             channelId={channelId}
-            onClose={() => setActiveThreadId(null)}
+            onClose={() => setActiveThread(null)}
           />
         </div>
       )}

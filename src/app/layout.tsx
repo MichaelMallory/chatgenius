@@ -3,6 +3,7 @@ import { GeistSans } from 'geist/font/sans'
 import "./globals.css";
 import SupabaseProvider from '@/components/providers/supabase-provider'
 import { ThemeProvider } from "@/components/providers/theme-provider"
+import { PresenceProvider } from "@/components/providers/presence-provider"
 import { Header } from "@/components/layout/header"
 import { cn } from "@/lib/utils";
 import { Toaster } from 'sonner'
@@ -30,9 +31,11 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <SupabaseProvider>
-            <Header />
-            {children}
-            <Toaster />
+            <PresenceProvider>
+              <Header />
+              {children}
+              <Toaster />
+            </PresenceProvider>
           </SupabaseProvider>
         </ThemeProvider>
       </body>

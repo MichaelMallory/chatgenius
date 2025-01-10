@@ -8,6 +8,7 @@ import { MessageSquare, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { PresenceIndicator } from '@/components/ui/presence-indicator';
 
 interface Profile {
   id: string;
@@ -145,10 +146,13 @@ export function DirectMessageList() {
           disabled={isProcessing === user.id}
         >
           <div className="flex items-center space-x-2 w-full">
-            <Avatar className="h-6 w-6">
-              <AvatarImage src={user.avatar_url || undefined} />
-              <AvatarFallback className="bg-slate-700 text-slate-200">{user.username[0].toUpperCase()}</AvatarFallback>
-            </Avatar>
+            <div className="relative">
+              <Avatar className="h-6 w-6">
+                <AvatarImage src={user.avatar_url || undefined} />
+                <AvatarFallback className="bg-slate-700 text-slate-200">{user.username[0].toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <PresenceIndicator userId={user.id} />
+            </div>
             <span className="truncate">{user.username}</span>
             {isProcessing === user.id && (
               <Loader2 className="h-4 w-4 animate-spin ml-auto" />

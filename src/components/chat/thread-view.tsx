@@ -7,6 +7,9 @@ import { MessageInput } from './message-input'
 import { Button } from '@/components/ui/button'
 import { X } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { formatDistanceToNow } from 'date-fns'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface ThreadViewProps {
   parentMessageId: string
@@ -125,10 +128,10 @@ export function ThreadView({ parentMessageId, channelId, onClose }: ThreadViewPr
   }
 
   return (
-    <div className="flex flex-col h-full border-l">
-      <div className="flex items-center justify-between p-4 border-b">
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between p-4 border-b bg-muted/50">
         <div className="flex items-center gap-2">
-          <h3 className="font-semibold">Thread</h3>
+          <h3 className="font-semibold text-sm">Thread</h3>
           {parentMessage && (
             <span className="text-sm text-muted-foreground">
               with {parentMessage.profiles.username}
@@ -139,33 +142,39 @@ export function ThreadView({ parentMessageId, channelId, onClose }: ThreadViewPr
           variant="ghost"
           size="icon"
           onClick={onClose}
+          className="h-8 w-8 rounded-full hover:bg-muted transition-colors"
         >
           <X className="h-4 w-4" />
+          <span className="sr-only">Close thread</span>
         </Button>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         {parentMessage && (
-          <div className="p-4 border-b bg-muted/50">
+          <div className="p-4 border-b bg-muted/30">
             <div className="flex items-start gap-3">
               <Avatar className="h-8 w-8">
                 <AvatarImage src={parentMessage.profiles.avatar_url || undefined} />
                 <AvatarFallback>{parentMessage.profiles.username[0].toUpperCase()}</AvatarFallback>
               </Avatar>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">{parentMessage.profiles.username}</span>
+                  <span className="font-medium text-sm">{parentMessage.profiles.username}</span>
                   <span className="text-xs text-muted-foreground">
-                    {new Date(parentMessage.created_at).toLocaleString()}
+                    {formatDistanceToNow(new Date(parentMessage.created_at), { addSuffix: true })}
                   </span>
                 </div>
-                <div className="mt-1 text-sm">{parentMessage.content}</div>
+                <div className="mt-1 text-sm break-words">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {parentMessage.content}
+                  </ReactMarkdown>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        <div className="flex flex-col">
+        <div className="flex flex-col divide-y">
           {replies.map((reply) => (
             <Message
               key={reply.id}
@@ -182,7 +191,7 @@ export function ThreadView({ parentMessageId, channelId, onClose }: ThreadViewPr
         </div>
       </div>
 
-      <div className="p-4 border-t">
+      <div className="p-4 border-t mt-auto">
         <MessageInput channelId={channelId} parentId={parentMessageId} />
       </div>
     </div>

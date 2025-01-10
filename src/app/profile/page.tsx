@@ -9,10 +9,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { Loader2, Upload } from 'lucide-react'
+import { PresenceIndicator } from '@/components/ui/presence-indicator'
 
 export default function ProfilePage() {
   const { supabase } = useSupabase()
   const [profile, setProfile] = useState<{
+    id: string
     username: string
     full_name: string
     avatar_url: string | null
@@ -26,7 +28,7 @@ export default function ProfilePage() {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('username, full_name, avatar_url')
+        .select('id, username, full_name, avatar_url')
         .eq('id', user.id)
         .single()
 
@@ -140,10 +142,13 @@ export default function ProfilePage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex flex-col items-center space-y-4">
-            <Avatar className="h-24 w-24">
-              <AvatarImage src={profile.avatar_url || undefined} />
-              <AvatarFallback>{profile.username[0].toUpperCase()}</AvatarFallback>
-            </Avatar>
+            <div className="relative">
+              <Avatar className="h-24 w-24">
+                <AvatarImage src={profile.avatar_url || undefined} />
+                <AvatarFallback>{profile.username[0].toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <PresenceIndicator userId={profile.id} className="h-4 w-4 border-[3px]" />
+            </div>
             <div className="flex items-center space-x-2">
               <Input
                 type="file"

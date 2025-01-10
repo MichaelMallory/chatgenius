@@ -1,34 +1,21 @@
 import { createClient } from '@supabase/supabase-js'
+import { Database } from './database.types'
 
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-  throw new Error('Missing env.NEXT_PUBLIC_SUPABASE_URL')
-}
-if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-  throw new Error('Missing env.NEXT_PUBLIC_SUPABASE_ANON_KEY')
-}
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-      storage: {
-        getItem: (key) => {
-          if (typeof window === 'undefined') return null
-          return window.localStorage.getItem(key)
-        },
-        setItem: (key, value) => {
-          if (typeof window === 'undefined') return
-          window.localStorage.setItem(key, value)
-        },
-        removeItem: (key) => {
-          if (typeof window === 'undefined') return
-          window.localStorage.removeItem(key)
-        },
-      },
+// Create a single instance of the Supabase client
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    storageKey: 'chatgenius-auth',
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    detectSessionInUrl: true,
+    flowType: 'pkce',
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
     },
-  }
-) 
+  },
+}) 
