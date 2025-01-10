@@ -15,6 +15,12 @@ interface MessageData {
   user_id: string
   channel_id: string
   parent_id: string | null
+  files: {
+    name: string
+    size: number
+    type: string
+    url: string
+  }[]
   profiles: {
     username: string
     avatar_url: string | null
@@ -73,6 +79,7 @@ export function MessageList({ channelId }: MessageListProps) {
             user_id,
             channel_id,
             parent_id,
+            files,
             profiles!inner (
               username,
               avatar_url
@@ -130,6 +137,7 @@ export function MessageList({ channelId }: MessageListProps) {
           user_id,
           channel_id,
           parent_id,
+          files,
           profiles!inner (
             username,
             avatar_url
@@ -154,7 +162,7 @@ export function MessageList({ channelId }: MessageListProps) {
       setMessages((prev) => prev.filter((msg) => msg.id !== payload.old.id))
     } else if (payload.eventType === 'UPDATE' && payload.new.channel_id === channelId) {
       setMessages((prev) => prev.map((msg) => 
-        msg.id === payload.new.id ? { ...msg, content: payload.new.content } : msg
+        msg.id === payload.new.id ? { ...msg, content: payload.new.content, files: payload.new.files } : msg
       ))
     }
   }, {
@@ -208,6 +216,7 @@ export function MessageList({ channelId }: MessageListProps) {
             createdAt={new Date(message.created_at)}
             userId={message.user_id}
             channelId={message.channel_id}
+            files={message.files}
             onDelete={handleDelete}
             onReply={handleReply}
             className="message-item"

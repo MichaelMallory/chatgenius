@@ -236,14 +236,40 @@
 ## UI Polish & File Sharing (Days 5-7)
 
 ### File System (Day 5)
-- [ ] File upload system
-  - [ ] Drag-and-drop interface
-  - [ ] Progress indicators
-  - [ ] File preview
-- [ ] File management
-  - [ ] File organization
-  - [ ] Permissions
-  - [ ] Deletion and archiving
+- [x] File upload system
+  - [x] Drag-and-drop interface
+    - Added file upload button in MessageInput component
+    - Implemented file selection with size limits (50MB total)
+    - Added file preview with remove option
+    - Supported multiple file uploads
+    - Added proper error handling and loading states
+  - [x] Progress indicators
+    - Added loading state during file upload
+    - Implemented optimistic UI updates
+    - Added error handling with toast notifications
+  - [x] File preview
+    - Created file preview component in Message
+    - Added image previews with thumbnails
+    - Implemented file type icons for non-image files
+    - Added file size formatting
+    - Added download button for files
+    - Supported files in both main messages and thread replies
+- [x] File management
+  - [x] File organization
+    - Created files column in messages table using jsonb[] type
+    - Organized files by channel in Supabase storage
+    - Implemented proper file naming with random IDs to prevent collisions
+    - Added support for multiple file types (images, videos, audio, documents)
+  - [x] Permissions
+    - Added RLS policies for file access in messages
+    - Created storage bucket policies for file uploads
+    - Restricted file access to channel members
+    - Added proper owner-based deletion policies
+  - [x] Deletion and archiving
+    - Implemented automatic file cleanup when messages are deleted
+    - Added cascade deletion in database schema
+    - Created storage cleanup policies
+    - Added proper error handling for file deletion
 
 ### UI Enhancement (Days 6-7)
 - [ ] Responsive design implementation

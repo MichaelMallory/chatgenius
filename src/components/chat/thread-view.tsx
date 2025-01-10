@@ -27,6 +27,12 @@ interface ThreadMessage {
   content: string
   user_id: string
   created_at: string
+  files: {
+    name: string
+    size: number
+    type: string
+    url: string
+  }[]
   profiles: Profile
 }
 
@@ -35,6 +41,12 @@ interface DatabaseMessage {
   content: string
   user_id: string
   created_at: string
+  files: {
+    name: string
+    size: number
+    type: string
+    url: string
+  }[]
   profiles: {
     username: string
     avatar_url: string | null
@@ -60,6 +72,7 @@ export function ThreadView({ parentMessageId, channelId, onClose }: ThreadViewPr
             content,
             user_id,
             created_at,
+            files,
             profiles:user_id (
               username,
               avatar_url
@@ -80,6 +93,7 @@ export function ThreadView({ parentMessageId, channelId, onClose }: ThreadViewPr
             content,
             user_id,
             created_at,
+            files,
             profiles:user_id (
               username,
               avatar_url
@@ -185,6 +199,7 @@ export function ThreadView({ parentMessageId, channelId, onClose }: ThreadViewPr
               createdAt={new Date(reply.created_at)}
               userId={reply.user_id}
               channelId={channelId}
+              files={reply.files}
               onDelete={handleDeleteReply}
             />
           ))}

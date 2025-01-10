@@ -3,7 +3,7 @@
 import { useState, useRef, KeyboardEvent, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Bold, Italic, Code, Send } from 'lucide-react'
+import { Bold, Italic, Code, Send, Paperclip, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSupabase } from '@/components/providers/supabase-provider'
 import { toast } from 'sonner'
@@ -20,7 +20,9 @@ export function MessageInput({ channelId, className, parentId }: MessageInputPro
   const [content, setContent] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [user, setUser] = useState<User | null>(null)
+  const [files, setFiles] = useState<File[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const { supabase } = useSupabase()
 
   // Get and track auth state
@@ -101,8 +103,19 @@ export function MessageInput({ channelId, className, parentId }: MessageInputPro
     textarea.focus()
   }
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(e.target.files || [])
+    // Limit total size to 50MB
+    const totalSize = selectedFiles.reduce((acc, file) => acc + file.size, 0)
+    if (totalSize > 50 * 1024 * 1024) {
+      toast.error('Total file size cannot exceed 50MB')
+      return
+    }
+    setFiles(selectedFiles)
+  }
+
   const handleSubmit = async () => {
-    if (!content.trim()) return
+    if (!content.trim() && files.length === 0) return
     if (!user) {
       toast.error('You must be logged in to send messages')
       return
@@ -129,13 +142,46 @@ export function MessageInput({ channelId, className, parentId }: MessageInputPro
         return
       }
 
+      // Upload files first if any
+      const uploadedFiles = []
+      if (files.length > 0) {
+        for (const file of files) {
+          const fileExt = file.name.split('.').pop()
+          const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+          const filePath = `${channelId}/${fileName}`
+
+          const { error: uploadError } = await supabase.storage
+            .from('message-attachments')
+            .upload(filePath, file)
+
+          if (uploadError) {
+            console.error('Error uploading file:', uploadError)
+            toast.error(`Failed to upload ${file.name}`)
+            return
+          }
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('message-attachments')
+            .getPublicUrl(filePath)
+
+          uploadedFiles.push({
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            url: publicUrl
+          })
+        }
+      }
+
+      // Create message with file references
       const { error: messageError } = await supabase
         .from('messages')
         .insert({
           content: content.trim(),
           channel_id: channelId,
           user_id: user.id,
-          parent_id: parentId
+          parent_id: parentId,
+          files: uploadedFiles
         })
 
       if (messageError) {
@@ -151,6 +197,10 @@ export function MessageInput({ channelId, className, parentId }: MessageInputPro
       }
 
       setContent('')
+      setFiles([])
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto'
       }
@@ -205,7 +255,43 @@ export function MessageInput({ channelId, className, parentId }: MessageInputPro
           <Code className="h-4 w-4" />
         </Button>
         <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => fileInputRef.current?.click()}
+          title="Attach files"
+        >
+          <Paperclip className="h-4 w-4" />
+        </Button>
+        <input
+          type="file"
+          ref={fileInputRef}
+          className="hidden"
+          onChange={handleFileChange}
+          multiple
+          accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+        />
       </div>
+      {files.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {files.map((file, index) => (
+            <div
+              key={index}
+              className="flex items-center gap-2 bg-muted/50 rounded-md p-2 text-sm"
+            >
+              <span className="truncate max-w-[200px]">{file.name}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-4 w-4"
+                onClick={() => setFiles(files.filter((_, i) => i !== index))}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="flex gap-2">
         <Textarea
           ref={textareaRef}
@@ -218,7 +304,7 @@ export function MessageInput({ channelId, className, parentId }: MessageInputPro
         />
         <Button
           onClick={handleSubmit}
-          disabled={!content.trim() || isSubmitting}
+          disabled={(!content.trim() && files.length === 0) || isSubmitting}
           className="self-end"
         >
           {isSubmitting ? (
