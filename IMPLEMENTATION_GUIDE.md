@@ -227,11 +227,25 @@
     - Implemented real-time updates using Supabase subscriptions
     - Added optimistic updates for better UX
     - Proper error handling and loading states
-- [ ] Search functionality
-  - [ ] Message search
-  - [ ] File search
-  - [ ] User search
-  - [ ] Advanced filters
+- [x] Search functionality
+  - [x] Message search
+    - Implemented full-text search using Supabase's built-in search capabilities
+    - Added search dialog with keyboard shortcut (Cmd/Ctrl + K)
+    - Added persistent search bar in header for easy access
+    - Implemented debounced search with loading states
+    - Added proper error handling and empty states
+  - [x] File search
+    - Integrated file search into the main search functionality
+    - Added file type indicators and previews in search results
+    - Implemented proper file navigation and highlighting
+  - [x] User search
+    - Added user avatars and usernames in search results
+    - Implemented proper user profile linking
+  - [x] Advanced filters
+    - Added support for channel-specific search results
+    - Implemented proper result categorization (messages, files, replies)
+    - Added date information for better context
+    - Optimized search performance with proper indexing
 
 ## UI Polish & File Sharing (Days 5-7)
 

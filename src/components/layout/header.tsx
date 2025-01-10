@@ -3,12 +3,14 @@
 import { Button } from '@/components/ui/button'
 import { useSupabase } from '@/components/providers/supabase-provider'
 import Link from 'next/link'
-import { LogIn, LogOut } from 'lucide-react'
+import { LogIn, LogOut, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { PresenceIndicator } from '@/components/ui/presence-indicator'
+import { Input } from '@/components/ui/input'
+import { SearchDialog } from '@/components/search/search-dialog'
 
 interface Profile {
   username: string;
@@ -20,6 +22,7 @@ export function Header() {
   const { supabase } = useSupabase()
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -134,10 +137,25 @@ export function Header() {
 
   return (
     <header className="border-b">
-      <div className="container flex h-14 items-center justify-between">
-        <Link href="/" className="font-semibold">
+      <div className="container flex h-14 items-center justify-between gap-4">
+        <Link href="/" className="font-semibold shrink-0">
           ChatGenius
         </Link>
+
+        {user && (
+          <div className="flex-1 max-w-xl flex justify-center">
+            <button
+              className="flex items-center gap-2 h-9 px-3 rounded-md border text-muted-foreground text-sm hover:bg-accent transition-colors"
+              onClick={() => setIsSearchOpen(true)}
+            >
+              <Search className="h-4 w-4" />
+              <span>Search</span>
+              <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+                <span className="text-xs">⌘</span>K
+              </kbd>
+            </button>
+          </div>
+        )}
 
         <div className="flex items-center gap-2">
           {user ? (
@@ -195,6 +213,7 @@ export function Header() {
           )}
         </div>
       </div>
+      <SearchDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
     </header>
   )
 } 

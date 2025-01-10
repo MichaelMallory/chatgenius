@@ -88,4 +88,17 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+@keyframes highlight {
+  0%, 25% {
+    background-color: hsl(217 91% 60% / 0.1);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.animate-highlight {
+  animation: highlight 20s cubic-bezier(0.4, 0, 0.2, 1);
 } 

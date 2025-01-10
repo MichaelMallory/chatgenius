@@ -10,6 +10,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { formatDistanceToNow } from 'date-fns'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { cn } from '@/lib/utils'
+import { useSearchParams } from 'next/navigation'
 
 interface ThreadViewProps {
   parentMessageId: string
@@ -28,6 +30,7 @@ interface ThreadMessage {
   user_id: string
   created_at: string
   files: {
+    id: string
     name: string
     size: number
     type: string
@@ -42,6 +45,7 @@ interface DatabaseMessage {
   user_id: string
   created_at: string
   files: {
+    id: string
     name: string
     size: number
     type: string
@@ -58,6 +62,7 @@ export function ThreadView({ parentMessageId, channelId, onClose }: ThreadViewPr
   const [parentMessage, setParentMessage] = useState<ThreadMessage | null>(null)
   const [replies, setReplies] = useState<ThreadMessage[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const searchParams = useSearchParams()
 
   useEffect(() => {
     const loadThread = async () => {
@@ -201,6 +206,10 @@ export function ThreadView({ parentMessageId, channelId, onClose }: ThreadViewPr
               channelId={channelId}
               files={reply.files}
               onDelete={handleDeleteReply}
+              className={cn(
+                "message-item",
+                searchParams.get('replyId') === reply.id && "animate-highlight"
+              )}
             />
           ))}
         </div>

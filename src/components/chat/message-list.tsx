@@ -7,6 +7,8 @@ import { useSupabase } from '@/components/providers/supabase-provider'
 import { supabase } from '@/lib/supabase'
 import { ThreadView } from './thread-view'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { ArrowDown } from 'lucide-react'
 
 interface MessageData {
   id: string
@@ -16,6 +18,7 @@ interface MessageData {
   channel_id: string
   parent_id: string | null
   files: {
+    id: string
     name: string
     size: number
     type: string
@@ -41,23 +44,30 @@ export function MessageList({ channelId }: MessageListProps) {
   const [messages, setMessages] = useState<MessageData[]>([])
   const [activeThread, setActiveThread] = useState<ThreadPosition | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showScrollButton, setShowScrollButton] = useState(false)
   const { supabase, user } = useSupabase()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messageListRef = useRef<HTMLDivElement>(null)
   const loadingTimeoutRef = useRef<NodeJS.Timeout>()
 
   const scrollToBottom = () => {
-    // First scroll instantly
-    messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
-    // Then do a final scroll after a longer delay to catch any late updates
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
-      // One final scroll to absolutely ensure we're at the bottom
-      requestAnimationFrame(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
-      })
-    }, 1000)
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
+
+  // Handle scroll events to show/hide scroll button
+  useEffect(() => {
+    const messageList = messageListRef.current
+    if (!messageList) return
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = messageList
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
+      setShowScrollButton(!isNearBottom)
+    }
+
+    messageList.addEventListener('scroll', handleScroll)
+    return () => messageList.removeEventListener('scroll', handleScroll)
+  }, [])
 
   // Initial message load
   useEffect(() => {
@@ -98,13 +108,6 @@ export function MessageList({ channelId }: MessageListProps) {
         }
 
         setMessages((data || []).reverse())
-        
-        // Set a timeout to scroll to bottom after components load
-        if (loadingTimeoutRef.current) {
-          clearTimeout(loadingTimeoutRef.current)
-        }
-        loadingTimeoutRef.current = setTimeout(scrollToBottom, 3000)
-
       } catch (error) {
         console.error('Error loading messages:', error)
         setError('An unexpected error occurred')
@@ -112,13 +115,6 @@ export function MessageList({ channelId }: MessageListProps) {
     }
 
     loadMessages()
-
-    // Cleanup timeout on unmount or channel change
-    return () => {
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current)
-      }
-    }
   }, [channelId, user, supabase])
 
   // Real-time message subscription
@@ -156,8 +152,16 @@ export function MessageList({ channelId }: MessageListProps) {
         // Add new message at the end since it's the newest
         return [...prev, newMessage]
       })
-      // Scroll to bottom when new message arrives
-      scrollToBottom()
+      
+      // Auto-scroll for new messages if user is already near bottom
+      if (messageListRef.current) {
+        const { scrollTop, scrollHeight, clientHeight } = messageListRef.current
+        const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
+        if (isNearBottom) {
+          scrollToBottom()
+        }
+        setShowScrollButton(!isNearBottom)
+      }
     } else if (payload.eventType === 'DELETE' && payload.old.channel_id === channelId) {
       setMessages((prev) => prev.filter((msg) => msg.id !== payload.old.id))
     } else if (payload.eventType === 'UPDATE' && payload.new.channel_id === channelId) {
@@ -204,7 +208,7 @@ export function MessageList({ channelId }: MessageListProps) {
 
   return (
     <div className="flex h-full relative" ref={messageListRef}>
-      <div className="flex-1 flex flex-col gap-2 p-4 relative overflow-y-auto">
+      <div className="flex-1 flex flex-col gap-2 p-4 pb-32 relative overflow-y-auto">
         <div className="flex-1" /> {/* Spacer to push messages to bottom */}
         {messages.map((message) => (
           <Message
@@ -223,6 +227,19 @@ export function MessageList({ channelId }: MessageListProps) {
           />
         ))}
         <div ref={messagesEndRef} className="h-0" />
+        {showScrollButton && (
+          <div className="sticky bottom-4 flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2 bg-background shadow-md hover:bg-accent"
+              onClick={scrollToBottom}
+            >
+              <ArrowDown className="h-4 w-4" />
+              <span>Scroll to Bottom</span>
+            </Button>
+          </div>
+        )}
       </div>
       {activeThread && (
         <div 

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -27,6 +28,7 @@ import {
 import Link from 'next/link'
 
 interface FileAttachment {
+  id: string
   name: string
   size: number
   type: string
@@ -41,7 +43,7 @@ interface MessageProps {
   createdAt: Date
   userId: string
   channelId: string
-  files?: FileAttachment[]
+  files: FileAttachment[] | null
   className?: string
   onDelete?: (messageId: string) => void
   onReply?: (messageId: string, event: React.MouseEvent<HTMLButtonElement>) => void
@@ -73,7 +75,7 @@ export function Message({
   createdAt,
   userId,
   channelId,
-  files = [],
+  files = null,
   className,
   onDelete,
   onReply
@@ -81,9 +83,12 @@ export function Message({
   const [isEditing, setIsEditing] = useState(false)
   const [editedContent, setEditedContent] = useState(content)
   const [replyCount, setReplyCount] = useState(0)
+  const [isHighlighted, setIsHighlighted] = useState(false)
   const { supabase } = useSupabase()
   const [currentUser, setCurrentUser] = useState<string | null>(null)
+  const searchParams = useSearchParams()
   const isCurrentUser = currentUser === userId
+  const messageRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const getUser = async () => {
@@ -92,6 +97,40 @@ export function Message({
     }
     getUser()
   }, [supabase])
+
+  // Handle message highlighting and reply thread
+  useEffect(() => {
+    const messageId = searchParams.get('messageId')
+    const fileId = searchParams.get('fileId')
+    const replyId = searchParams.get('replyId')
+    
+    console.log('Highlight check:', {
+      messageId,
+      currentMessageId: id,
+      fileId,
+      files,
+      matches: {
+        messageMatch: messageId === id,
+        fileMatch: fileId && files?.some?.(file => file.id === fileId)
+      }
+    })
+    
+    const shouldHighlight = 
+      messageId === id || 
+      (fileId && files?.some?.(file => file.id === fileId))
+      
+    if (shouldHighlight) {
+      setIsHighlighted(true)
+      // Scroll the message into view with a smooth animation
+      messageRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      })
+      // Remove highlight after animation
+      const timeout = setTimeout(() => setIsHighlighted(false), 20000)
+      return () => clearTimeout(timeout)
+    }
+  }, [id, files, searchParams])
 
   // Load reply count
   useEffect(() => {
@@ -149,10 +188,14 @@ export function Message({
   }
 
   return (
-    <div className={cn(
-      "flex gap-3 p-4 hover:bg-muted/50 transition-colors group",
-      className
-    )}>
+    <div 
+      ref={messageRef}
+      className={cn(
+        "flex gap-3 p-4 hover:bg-muted/50 transition-colors group relative",
+        isHighlighted && "animate-highlight",
+        className
+      )}
+    >
       <Link href={`/users/${userId}`} className="hover:opacity-80 transition-opacity">
         <Avatar className="h-8 w-8">
           <AvatarImage src={avatarUrl} />

@@ -174,7 +174,7 @@ export function MessageInput({ channelId, className, parentId }: MessageInputPro
       }
 
       // Create message with file references
-      const { error: messageError } = await supabase
+      const { data: message, error: messageError } = await supabase
         .from('messages')
         .insert({
           content: content.trim(),
@@ -183,6 +183,8 @@ export function MessageInput({ channelId, className, parentId }: MessageInputPro
           parent_id: parentId,
           files: uploadedFiles
         })
+        .select()
+        .single()
 
       if (messageError) {
         if (messageError.code === '42501') {
@@ -194,6 +196,24 @@ export function MessageInput({ channelId, className, parentId }: MessageInputPro
           toast.error('Failed to send message')
         }
         return
+      }
+
+      // Create file records after message is created
+      if (uploadedFiles.length > 0) {
+        const { error: fileError } = await supabase
+          .from('files')
+          .insert(uploadedFiles.map(file => ({
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            url: file.url,
+            message_id: message.id
+          })))
+
+        if (fileError) {
+          console.error('Error creating file records:', fileError)
+          // Don't show error to user since message was sent successfully
+        }
       }
 
       setContent('')
