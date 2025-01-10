@@ -123,7 +123,7 @@ export function Message({
       "flex gap-3 p-4 hover:bg-muted/50 transition-colors group",
       isCurrentUser && "flex-row-reverse"
     )}>
-      <Avatar>
+      <Avatar className="h-8 w-8">
         <AvatarImage src={avatarUrl} />
         <AvatarFallback>{username[0].toUpperCase()}</AvatarFallback>
       </Avatar>

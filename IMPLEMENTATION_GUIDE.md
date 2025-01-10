@@ -79,6 +79,15 @@
     - Created sign-up page with username/email/password
     - Added form validation and error handling
     - Implemented loading states
+  - [x] Implement profile picture management
+    - Created profile page with avatar upload functionality
+    - Added Supabase Storage bucket for avatars with proper RLS policies
+    - Implemented real-time avatar updates using Supabase subscriptions
+    - Added proper cleanup of old avatar files
+    - Configured avatar display in header, messages, and direct message list
+    - Improved avatar fallback visibility in dark theme
+    - Added file type and size validation (max 5MB)
+    - Implemented optimistic updates for better UX
   - [x] Implement OAuth providers
     - Added GitHub OAuth integration
     - Added Google OAuth integration
@@ -180,10 +189,20 @@
   - [ ] User roles and permissions
 
 ### Threading & Search (Day 4)
-- [ ] Thread implementation
-  - [ ] Thread UI components
-  - [ ] Thread navigation
-  - [ ] Thread notifications
+- [x] Thread implementation
+  - [x] Thread UI components
+    - Created ThreadView component with real-time updates
+    - Implemented thread message loading with parent message context
+    - Added loading states and error handling
+    - Created responsive thread sidebar layout
+  - [x] Thread navigation
+    - Added thread opening/closing functionality
+    - Implemented thread message sorting by creation time
+    - Added proper state management for active threads
+  - [x] Thread notifications
+    - Implemented real-time updates using Supabase subscriptions
+    - Added optimistic updates for better UX
+    - Proper error handling and loading states
 - [ ] Search functionality
   - [ ] Message search
   - [ ] File search

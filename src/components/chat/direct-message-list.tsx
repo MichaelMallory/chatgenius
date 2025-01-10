@@ -7,6 +7,7 @@ import { useSupabase } from '@/lib/hooks/use-supabase';
 import { MessageSquare, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface Profile {
   id: string;
@@ -63,102 +64,65 @@ export function DirectMessageList() {
     }
   };
 
-  const findOrCreateDMChannel = async (otherUserId: string) => {
+  useEffect(() => {
+    fetchData();
+  }, [supabase]);
+
+  const handleStartDM = async (targetUserId: string) => {
     try {
-      setIsProcessing(otherUserId);
+      setIsProcessing(targetUserId);
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError) throw authError;
       if (!user) return;
 
-      // Verify the other user still exists
-      const { data: otherUserData, error: userError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', otherUserId)
-        .single();
+      // Check if DM channel already exists
+      const existingChannel = channels.find(channel =>
+        channel.participants.includes(user.id) &&
+        channel.participants.includes(targetUserId)
+      );
 
-      if (userError || !otherUserData) {
-        toast.error('User no longer exists');
-        await fetchData(); // Refresh the user list
-        return;
-      }
-
-      // Check if DM channel already exists with current participants
-      const { data: existingChannel, error: channelError } = await supabase
-        .from('channels')
-        .select('id')
-        .eq('is_direct_message', true)
-        .contains('participants', [user.id, otherUserId])
-        .single();
-
-      if (!channelError && existingChannel) {
+      if (existingChannel) {
         router.push(`/channels/${existingChannel.id}`);
         return;
       }
 
       // Create new DM channel
-      const channelName = `dm-${user.id}-${otherUserId}`;
-      const { data: newChannel, error: createError } = await supabase
+      const { data: channelData, error: channelError } = await supabase
         .from('channels')
         .insert({
-          name: channelName,
-          description: `Direct message between users`,
+          name: `dm-${user.id}-${targetUserId}`,
           is_direct_message: true,
-          created_by: user.id,
-          participants: [user.id, otherUserId]
+          participants: [user.id, targetUserId],
+          created_by: user.id
         })
         .select()
         .single();
 
-      if (createError) throw createError;
+      if (channelError) throw channelError;
 
       // Add both users to the channel
       const { error: membershipError } = await supabase
         .from('user_channels')
         .insert([
-          { channel_id: newChannel.id, user_id: user.id, role: 'member' },
-          { channel_id: newChannel.id, user_id: otherUserId, role: 'member' }
+          { user_id: user.id, channel_id: channelData.id },
+          { user_id: targetUserId, channel_id: channelData.id }
         ]);
 
       if (membershipError) throw membershipError;
 
-      router.push(`/channels/${newChannel.id}`);
+      // Navigate to the new channel
+      router.push(`/channels/${channelData.id}`);
     } catch (error) {
-      console.error('Error handling DM:', error);
-      toast.error('Failed to open direct message');
+      console.error('Error starting DM:', error);
+      toast.error('Failed to start direct message');
     } finally {
       setIsProcessing(null);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-
-    // Subscribe to channel changes
-    const channelsSubscription = supabase
-      .channel('dm-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'channels',
-          filter: 'is_direct_message=eq.true',
-        },
-        () => {
-          fetchData();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      channelsSubscription.unsubscribe();
-    };
-  }, [supabase]);
-
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-4">
+      <div className="flex items-center justify-center p-4">
         <Loader2 className="h-4 w-4 animate-spin" />
       </div>
     );
@@ -172,21 +136,24 @@ export function DirectMessageList() {
           variant="ghost"
           size="sm"
           className={cn(
-            'w-full justify-start text-slate-50 hover:bg-slate-800',
-            pathname === `/channels/${
-              channels.find(c => 
-                c.participants.includes(user.id)
-              )?.id
-            }` && 'bg-slate-800'
+            "w-full justify-start",
+            pathname === `/channels/${channels.find(channel =>
+              channel.participants.includes(user.id)
+            )?.id}` && "bg-muted"
           )}
-          onClick={() => findOrCreateDMChannel(user.id)}
+          onClick={() => handleStartDM(user.id)}
           disabled={isProcessing === user.id}
         >
-          <MessageSquare className="mr-2 h-4 w-4" />
-          {user.username}
-          {isProcessing === user.id && (
-            <Loader2 className="ml-2 h-3 w-3 animate-spin" />
-          )}
+          <div className="flex items-center space-x-2 w-full">
+            <Avatar className="h-6 w-6">
+              <AvatarImage src={user.avatar_url || undefined} />
+              <AvatarFallback className="bg-slate-700 text-slate-200">{user.username[0].toUpperCase()}</AvatarFallback>
+            </Avatar>
+            <span className="truncate">{user.username}</span>
+            {isProcessing === user.id && (
+              <Loader2 className="h-4 w-4 animate-spin ml-auto" />
+            )}
+          </div>
         </Button>
       ))}
     </div>

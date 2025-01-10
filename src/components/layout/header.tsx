@@ -3,13 +3,16 @@
 import { Button } from '@/components/ui/button'
 import { useSupabase } from '@/components/providers/supabase-provider'
 import Link from 'next/link'
-import { LogIn, LogOut, User } from 'lucide-react'
+import { LogIn, LogOut } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 interface Profile {
   username: string;
+  full_name: string;
+  avatar_url: string | null;
 }
 
 export function Header() {
@@ -21,34 +24,39 @@ export function Header() {
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
+      console.log('Initial user fetch:', user?.id)
       setUser(user)
 
       if (user) {
         const { data: profileData, error } = await supabase
           .from('profiles')
-          .select('username')
+          .select('username, full_name, avatar_url')
           .eq('id', user.id)
           .single()
 
         if (!error) {
+          console.log('Initial profile fetch:', profileData)
           setProfile(profileData)
         }
       }
     }
     getUser()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // Subscribe to auth changes
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const currentUser = session?.user ?? null
+      console.log('Auth state changed:', currentUser?.id)
       setUser(currentUser)
 
       if (currentUser) {
         const { data: profileData, error } = await supabase
           .from('profiles')
-          .select('username')
+          .select('username, full_name, avatar_url')
           .eq('id', currentUser.id)
           .single()
 
         if (!error) {
+          console.log('Profile fetch on auth change:', profileData)
           setProfile(profileData)
         }
       } else {
@@ -57,9 +65,50 @@ export function Header() {
     })
 
     return () => {
-      subscription.unsubscribe()
+      console.log('Cleaning up auth subscription')
+      authSubscription.unsubscribe()
     }
   }, [supabase])
+
+  // Separate effect for profile changes subscription
+  useEffect(() => {
+    if (!user?.id) return
+
+    console.log('Setting up profile subscription for user:', user.id)
+    
+    // Subscribe to profile changes
+    const channel = supabase
+      .channel(`profile-changes-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        async (payload) => {
+          console.log('Profile update received:', payload.new)
+          // Fetch fresh profile data to ensure we have all fields
+          const { data: profileData, error } = await supabase
+            .from('profiles')
+            .select('username, full_name, avatar_url')
+            .eq('id', user.id)
+            .single()
+
+          if (!error && profileData) {
+            console.log('Updated profile data:', profileData)
+            setProfile(profileData)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      console.log('Cleaning up profile subscription')
+      channel.unsubscribe()
+    }
+  }, [supabase, user?.id])
 
   const handleSignOut = async () => {
     try {
@@ -99,10 +148,14 @@ export function Header() {
                 variant="ghost"
                 size="sm"
                 asChild
+                className="space-x-2"
               >
                 <Link href="/profile">
-                  <User className="h-4 w-4" />
-                  Profile
+                  <Avatar className="h-6 w-6">
+                    <AvatarImage src={profile?.avatar_url || undefined} />
+                    <AvatarFallback>{profile?.username?.[0].toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <span>Profile</span>
                 </Link>
               </Button>
               <Button
@@ -110,7 +163,7 @@ export function Header() {
                 size="sm"
                 onClick={handleSignOut}
               >
-                <LogOut className="h-4 w-4" />
+                <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
               </Button>
             </>
@@ -122,7 +175,7 @@ export function Header() {
                 asChild
               >
                 <Link href="/sign-in">
-                  <LogIn className="h-4 w-4" />
+                  <LogIn className="h-4 w-4 mr-2" />
                   Sign In
                 </Link>
               </Button>
