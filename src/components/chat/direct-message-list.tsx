@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useSupabase } from '@/lib/hooks/use-supabase';
@@ -31,7 +31,7 @@ export function DirectMessageList() {
   const { supabase } = useSupabase();
   const router = useRouter();
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setIsLoading(true);
       const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -64,11 +64,11 @@ export function DirectMessageList() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [supabase]);
 
   useEffect(() => {
     fetchData();
-  }, [supabase]);
+  }, [fetchData]);
 
   const handleStartDM = async (targetUserId: string) => {
     try {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useSupabase } from '@/lib/hooks/use-supabase';
 import { toast } from 'sonner';
 import { ChannelList } from './channel-list';
@@ -18,7 +18,7 @@ export function ChannelProvider() {
   const [isLoading, setIsLoading] = useState(true);
   const { supabase } = useSupabase();
 
-  const fetchChannels = async () => {
+  const fetchChannels = useCallback(async () => {
     try {
       setIsLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
@@ -65,7 +65,7 @@ export function ChannelProvider() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [supabase]);
 
   const handleChannelCreated = (newChannel: Channel) => {
     setChannels(prevChannels => {
@@ -109,7 +109,7 @@ export function ChannelProvider() {
     return () => {
       channelsSubscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [supabase, fetchChannels]);
 
   return (
     <div>

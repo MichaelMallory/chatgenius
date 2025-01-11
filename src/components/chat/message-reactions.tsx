@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { EmojiPicker } from './emoji-picker'
 import { useSupabase } from '@/components/providers/supabase-provider'
@@ -22,161 +22,78 @@ interface MessageReactionsProps {
 
 export function MessageReactions({ messageId, channelId, className }: MessageReactionsProps) {
   const [reactions, setReactions] = useState<Reaction[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [showPicker, setShowPicker] = useState(false)
   const { supabase } = useSupabase()
   const [user, setUser] = useState<User | null>(null)
 
-  // Get and track auth state
   useEffect(() => {
-    let mounted = true
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+    }
+    getUser()
+  }, [supabase.auth])
+
+  const loadReactions = useCallback(async () => {
+    if (!messageId) return;
+
+    const { data, error } = await supabase
+      .from('reactions')
+      .select('emoji, user_id')
+      .eq('message_id', messageId);
+
+    if (error) {
+      console.error('Error loading reactions:', error);
+      return;
+    }
+
+    // Group reactions by emoji
+    const groupedReactions = data.reduce((acc: Reaction[], reaction) => {
+      const existing = acc.find(r => r.emoji === reaction.emoji);
+      if (existing) {
+        existing.count++;
+        existing.userIds.push(reaction.user_id);
+        if (reaction.user_id === user?.id) {
+          existing.reacted = true;
+        }
+      } else {
+        acc.push({
+          emoji: reaction.emoji,
+          count: 1,
+          reacted: reaction.user_id === user?.id,
+          userIds: [reaction.user_id]
+        });
+      }
+      return acc;
+    }, []);
+
+    setReactions(groupedReactions);
+  }, [messageId, supabase, user?.id]);
+
+  useEffect(() => {
+    loadReactions();
+
+    const channel = supabase.channel(`message-${messageId}-reactions`);
     
-    const setupAuth = async () => {
-      try {
-        // Get initial auth state
-        const { data: { session } } = await supabase.auth.getSession()
-        if (mounted) {
-          setUser(session?.user ?? null)
+    channel
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'reactions',
+          filter: `message_id=eq.${messageId}`,
+        },
+        () => {
+          loadReactions();
         }
+      )
+      .subscribe();
 
-        // Subscribe to auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-          if (mounted) {
-            setUser(session?.user ?? null)
-          }
-        })
-
-        return () => {
-          mounted = false
-          subscription.unsubscribe()
-        }
-      } catch (error) {
-        console.error('Error setting up auth:', error)
-        return () => {
-          mounted = false
-        }
-      }
-    }
-
-    setupAuth()
-  }, [supabase])
-
-  // Load initial reactions
-  useEffect(() => {
-    const loadReactions = async () => {
-      if (!user) {
-        setIsLoading(false)
-        return
-      }
-
-      try {
-        setIsLoading(true)
-        const { data, error } = await supabase
-          .from('reactions')
-          .select('emoji, user_id')
-          .eq('message_id', messageId)
-
-        if (error) {
-          console.error('Error loading reactions:', error)
-          toast.error('Failed to load reactions')
-          return
-        }
-
-        // Group reactions by emoji and track who has reacted
-        const reactionCounts = (data || []).reduce((acc: { [key: string]: Reaction }, reaction) => {
-          if (!acc[reaction.emoji]) {
-            acc[reaction.emoji] = {
-              emoji: reaction.emoji,
-              count: 0,
-              reacted: false,
-              userIds: []
-            }
-          }
-          // Only count if this user hasn't already reacted with this emoji
-          if (!acc[reaction.emoji].userIds.includes(reaction.user_id)) {
-            acc[reaction.emoji].count++
-            acc[reaction.emoji].userIds.push(reaction.user_id)
-            if (reaction.user_id === user.id) {
-              acc[reaction.emoji].reacted = true
-            }
-          }
-          return acc
-        }, {})
-
-        setReactions(Object.values(reactionCounts))
-      } catch (error) {
-        console.error('Error in loadReactions:', error)
-        toast.error('Failed to load reactions')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadReactions()
-  }, [messageId, user])
-
-  // Real-time reaction updates
-  useRealtime<{ emoji: string; user_id: string; message_id: string }>(
-    'reactions',
-    (payload) => {
-      if (!user) return
-
-      // For INSERT events
-      if (payload.eventType === 'INSERT' && payload.new.message_id === messageId) {
-        setReactions((prev) => {
-          const existing = prev.find((r) => r.emoji === payload.new.emoji)
-          if (existing) {
-            // Only update if this user hasn't already reacted
-            if (!existing.userIds.includes(payload.new.user_id)) {
-              return prev.map((r) =>
-                r.emoji === payload.new.emoji
-                  ? {
-                      ...r,
-                      count: r.count + 1,
-                      reacted: r.reacted || payload.new.user_id === user.id,
-                      userIds: [...r.userIds, payload.new.user_id]
-                    }
-                  : r
-              )
-            }
-            return prev
-          } else {
-            return [
-              ...prev,
-              {
-                emoji: payload.new.emoji,
-                count: 1,
-                reacted: payload.new.user_id === user.id,
-                userIds: [payload.new.user_id]
-              }
-            ]
-          }
-        })
-      }
-      
-      // For DELETE events
-      if (payload.eventType === 'DELETE' && payload.old && 'message_id' in payload.old) {
-        const oldPayload = payload.old as { emoji: string; user_id: string; message_id: string }
-        if (oldPayload.message_id !== messageId) return
-
-        setReactions((prev) =>
-          prev.map((r) =>
-            r.emoji === oldPayload.emoji && r.userIds.includes(oldPayload.user_id)
-              ? {
-                  ...r,
-                  count: r.count - 1,
-                  reacted: oldPayload.user_id === user.id ? false : r.reacted,
-                  userIds: r.userIds.filter(id => id !== oldPayload.user_id)
-                }
-              : r
-          ).filter((r) => r.count > 0)
-        )
-      }
-    },
-    {
-      filter: `message_id=eq.${messageId}`,
-      event: '*'
-    }
-  )
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [messageId, loadReactions, supabase]);
 
   const handleReaction = async (emoji: { native: string }) => {
     if (!user) {
@@ -316,10 +233,6 @@ export function MessageReactions({ messageId, channelId, className }: MessageRea
 
   if (!user) {
     return null // Don't show reactions for logged out users
-  }
-
-  if (isLoading) {
-    return null // Or a loading skeleton if you prefer
   }
 
   return (

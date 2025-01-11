@@ -117,7 +117,7 @@ export const CreateChannelDialog: React.FC<CreateChannelDialogProps> = ({ onChan
         <AlertDialogHeader>
           <AlertDialogTitle>Create a New Channel</AlertDialogTitle>
           <AlertDialogDescription>
-            Channels are where conversations happen. They're best organized around a topic — #marketing, for example.
+            Channels are where conversations happen. They&apos;re best organized around a topic — #marketing, for example.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="grid gap-4 py-4">

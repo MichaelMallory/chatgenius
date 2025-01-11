@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -26,6 +26,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import Link from 'next/link'
+import Image from 'next/image'
 
 interface FileAttachment {
   id: string
@@ -90,13 +91,14 @@ export function Message({
   const isCurrentUser = currentUser === userId
   const messageRef = useRef<HTMLDivElement>(null)
 
+  const getUser = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    setCurrentUser(user?.id ?? null)
+  }, [supabase.auth]);
+
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setCurrentUser(user?.id ?? null)
-    }
     getUser()
-  }, [supabase])
+  }, [getUser]);
 
   // Handle message highlighting and reply thread
   useEffect(() => {
@@ -295,18 +297,14 @@ export function Message({
                       className="flex items-start gap-2 p-2 rounded-md bg-muted/50 max-w-md"
                     >
                       {isImage ? (
-                        <a
-                          href={file.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block hover:opacity-90 transition-opacity"
-                        >
-                          <img
+                        <div className="relative w-48 h-48">
+                          <Image
                             src={file.url}
                             alt={file.name}
-                            className="rounded-md max-h-48 object-cover"
+                            fill
+                            className="object-cover rounded-lg"
                           />
-                        </a>
+                        </div>
                       ) : (
                         <div className="flex items-center gap-2 flex-1">
                           <FileIcon className="h-8 w-8 text-muted-foreground shrink-0" />

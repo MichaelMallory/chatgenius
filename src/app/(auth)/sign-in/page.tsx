@@ -60,9 +60,9 @@ export default function SignInPage() {
     <div className="container mx-auto flex items-center justify-center min-h-screen p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Sign In</CardTitle>
-          <CardDescription>
-            Sign in to your account to continue
+          <CardTitle className="text-2xl text-center">Sign in to your account</CardTitle>
+          <CardDescription className="text-center">
+            Enter your email and password to sign in to your account
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSignIn}>
@@ -108,7 +108,7 @@ export default function SignInPage() {
               Sign in with GitHub
             </Button>
             <p className="text-sm text-center text-muted-foreground">
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <Link href="/sign-up" className="text-primary hover:underline">
                 Sign up
               </Link>
