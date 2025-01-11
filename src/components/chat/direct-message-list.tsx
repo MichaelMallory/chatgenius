@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
@@ -28,15 +28,15 @@ export function DirectMessageList() {
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const pathname = usePathname();
-  const { supabase } = useSupabase();
+  const { supabase, user } = useSupabase();
   const router = useRouter();
 
   const fetchData = useCallback(async () => {
     try {
-      setIsLoading(true);
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError) throw authError;
-      if (!user) return;
+      if (!user) {
+        // If no user, don't try to fetch data yet
+        return;
+      }
 
       // Fetch all users except current user
       const { data: usersData, error: usersError } = await supabase
@@ -64,7 +64,7 @@ export function DirectMessageList() {
     } finally {
       setIsLoading(false);
     }
-  }, [supabase]);
+  }, [supabase, user]);
 
   useEffect(() => {
     fetchData();
@@ -72,57 +72,77 @@ export function DirectMessageList() {
 
   const handleStartDM = async (targetUserId: string) => {
     try {
-      setIsProcessing(targetUserId);
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError) throw authError;
-      if (!user) return;
-
-      // Check if DM channel already exists
-      const existingChannel = channels.find(channel =>
-        channel.participants.includes(user.id) &&
-        channel.participants.includes(targetUserId)
-      );
-
-      if (existingChannel) {
-        router.push(`/channels/${existingChannel.id}`);
+      if (!user) {
+        toast.error('Please sign in to start a direct message');
         return;
       }
 
-      // Create new DM channel
-      const { data: channelData, error: channelError } = await supabase
-        .from('channels')
-        .insert({
-          name: `dm-${user.id}-${targetUserId}`,
-          is_direct_message: true,
-          participants: [user.id, targetUserId],
-          created_by: user.id
-        })
-        .select()
-        .single();
+      setIsProcessing(targetUserId);
 
-      if (channelError) throw channelError;
+      // First check local state
+      const existingLocalChannel = channels.find(
+        (channel) =>
+          channel.participants.includes(user.id) && channel.participants.includes(targetUserId)
+      );
 
-      // Add both users to the channel
-      const { error: membershipError } = await supabase
-        .from('user_channels')
-        .insert([
+      // Even if we don't find it locally, double check the database
+      if (!existingLocalChannel) {
+        const { data: existingChannels, error: checkError } = await supabase
+          .from('channels')
+          .select('id, participants')
+          .eq('is_direct_message', true)
+          .contains('participants', [user.id, targetUserId])
+          .single();
+
+        if (!checkError && existingChannels) {
+          // Found in database but not in local state, update local state
+          setChannels((prev) => [...prev, existingChannels]);
+          router.push(`/channels/${existingChannels.id}`);
+          return;
+        }
+
+        // If we get here, we need to create a new channel
+        const { data: channelData, error: channelError } = await supabase
+          .from('channels')
+          .insert({
+            name: `dm-${user.id}-${targetUserId}`,
+            is_direct_message: true,
+            participants: [user.id, targetUserId],
+            created_by: user.id,
+          })
+          .select()
+          .single();
+
+        if (channelError) throw channelError;
+
+        // Add both users to the channel
+        const { error: membershipError } = await supabase.from('user_channels').insert([
           { user_id: user.id, channel_id: channelData.id },
-          { user_id: targetUserId, channel_id: channelData.id }
+          { user_id: targetUserId, channel_id: channelData.id },
         ]);
 
-      if (membershipError) throw membershipError;
+        if (membershipError) throw membershipError;
 
-      // Navigate to the new channel
-      router.push(`/channels/${channelData.id}`);
+        // Create and add the new channel to local state
+        const newChannel: DirectMessageChannel = {
+          id: channelData.id,
+          participants: [user.id, targetUserId],
+        };
+        setChannels((prev) => [...prev, newChannel]);
+        router.push(`/channels/${newChannel.id}`);
+      } else {
+        // Use existing channel from local state
+        router.push(`/channels/${existingLocalChannel.id}`);
+      }
     } catch (error) {
-      console.error('Error starting DM:', error);
-      toast.error('Failed to start direct message');
+      console.error('Error with DM channel:', error);
+      toast.error('Failed to access direct message');
     } finally {
       setIsProcessing(null);
     }
   };
 
-  if (isLoading) {
+  if (isLoading && !users.length) {
     return (
       <div className="flex items-center justify-center p-4">
         <Loader2 className="h-4 w-4 animate-spin" />
@@ -138,31 +158,35 @@ export function DirectMessageList() {
           variant="ghost"
           size="sm"
           className={cn(
-            "w-full justify-start",
-            pathname === `/channels/${channels.find(channel =>
-              channel.participants.includes(user.id)
-            )?.id}` && "bg-muted"
+            'w-full justify-start',
+            pathname ===
+              `/channels/${channels.find((channel) => channel.participants.includes(user.id))
+                ?.id}` && 'bg-muted'
           )}
           onClick={() => handleStartDM(user.id)}
           disabled={isProcessing === user.id}
         >
           <div className="flex items-center space-x-2 w-full">
             <div className="relative">
-              <Link href={`/users/${user.id}`} className="hover:opacity-80 transition-opacity" onClick={(e) => e.stopPropagation()}>
+              <Link
+                href={`/users/${user.id}`}
+                className="hover:opacity-80 transition-opacity"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <Avatar className="h-6 w-6">
                   <AvatarImage src={user.avatar_url || undefined} />
-                  <AvatarFallback className="bg-slate-700 text-slate-200">{user.username[0].toUpperCase()}</AvatarFallback>
+                  <AvatarFallback className="bg-slate-700 text-slate-200">
+                    {user.username[0].toUpperCase()}
+                  </AvatarFallback>
                 </Avatar>
               </Link>
               <PresenceIndicator userId={user.id} />
             </div>
             <span className="truncate">{user.username}</span>
-            {isProcessing === user.id && (
-              <Loader2 className="h-4 w-4 animate-spin ml-auto" />
-            )}
+            {isProcessing === user.id && <Loader2 className="h-4 w-4 animate-spin ml-auto" />}
           </div>
         </Button>
       ))}
     </div>
   );
-} 
+}
