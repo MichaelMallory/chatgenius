@@ -1,38 +1,135 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ChatGenius
 
-## Getting Started
+<p align="center">
+  <img src="public/logo.png" alt="ChatGenius Logo" width="200"/>
+</p>
 
-First, run the development server:
+ChatGenius is a modern, real-time chat application built with Next.js 14, TypeScript, and Supabase. It features a rich set of communication tools including channels, direct messaging, thread discussions, file sharing, and reactions - all with real-time updates and a beautiful, responsive UI.
 
+## ✨ Features
+
+### 💬 Real-time Communication
+- Public and private channels
+- Direct messaging
+- Thread discussions
+- Message formatting with Markdown support
+- Emoji reactions
+- Real-time presence indicators
+- Message editing and deletion
+- Typing indicators
+
+### 📎 File Sharing
+- Drag-and-drop file uploads
+- Image previews and thumbnails
+- Support for multiple file types
+- 50MB file size limit
+- Secure file storage and access control
+
+### 🔍 Search & Discovery
+- Full-text search across messages
+- File search with previews
+- User search with profile links
+- Advanced filters and categorization
+- Keyboard shortcuts (Cmd/Ctrl + K)
+
+### 👤 User Management
+- Email/password authentication
+- OAuth support (GitHub, Google)
+- Profile customization
+- Status updates
+- Real-time presence tracking
+- Avatar management
+
+### 🔒 Security
+- Row Level Security (RLS)
+- Protected routes
+- Secure file access
+- Role-based permissions
+
+## 🚀 Tech Stack
+
+- **Frontend**: Next.js 14, TypeScript, Tailwind CSS, shadcn/ui
+- **Backend**: Supabase (PostgreSQL, Auth, Storage, Real-time)
+- **State Management**: React Context, Custom Hooks
+- **Testing**: Jest, React Testing Library
+- **CI/CD**: GitHub Actions
+- **Styling**: Tailwind CSS, shadcn/ui components
+
+## 📦 Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/chatgenius.git
+cd chatgenius
+```
+
+2. Install dependencies:
+```bash
+npm install
+# or
+yarn install
+```
+
+3. Set up environment variables:
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local` with your Supabase credentials:
+```
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+4. Run the development server:
 ```bash
 npm run dev
 # or
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to see the application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🛠️ Development
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Prerequisites
+- Node.js 18+
+- npm or yarn
+- Supabase account
 
-## Learn More
+### Project Structure
+```
+src/
+  ├── app/              # Next.js app router pages
+  ├── components/       # React components
+  │   ├── chat/        # Chat-related components
+  │   ├── channel/     # Channel components
+  │   ├── ui/          # Reusable UI components
+  │   └── providers/   # Context providers
+  ├── lib/             # Utility functions and configs
+  └── styles/          # Global styles
+```
 
-To learn more about Next.js, take a look at the following resources:
+### Database Schema
+The application uses the following main tables:
+- `profiles`: User profiles and status
+- `channels`: Chat channels and settings
+- `messages`: Chat messages with threading
+- `files`: File attachments
+- `reactions`: Message reactions
+- `user_channels`: Channel membership and roles
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🤝 Contributing
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
-## Deploy on Vercel
+## 📄 License
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🙏 Acknowledgments
 
-# chatgenius chatgenius chatgenius
+- [Next.js](https://nextjs.org/)
+- [Supabase](https://supabase.com/)
+- [shadcn/ui](https://ui.shadcn.com/)
+- [Tailwind CSS](https://tailwindcss.com/)
