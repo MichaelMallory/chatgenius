@@ -8,7 +8,7 @@ export async function GET() {
   try {
     // Initialize OpenAI
     const openai = new OpenAI({
-      apiKey: env.OPENAI_API_KEY,
+      openAIApiKey: env.OPENAI_API_KEY,
     });
 
     // Initialize Pinecone

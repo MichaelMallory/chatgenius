@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { type ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import { env } from '@/lib/env';
 import { exponentialBackoff } from '@/lib/utils/backoff';
 import { type PromptTemplate } from './prompt-engineering';
@@ -29,7 +30,7 @@ const DEFAULT_OPTIONS: ChatCompletionOptions = {
   presencePenalty: 0,
 };
 
-type ChatRole = 'system' | 'user' | 'assistant';
+type ChatRole = 'system' | 'user' | 'assistant' | 'function';
 
 export interface ChatResponse {
   content: string;
@@ -46,10 +47,13 @@ export async function generateChatResponse(
 ): Promise<ChatResponse> {
   const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
 
-  const messages = [prompt.systemMessage, { role: 'user' as const, content: prompt.userMessage }];
+  const messages: ChatCompletionMessageParam[] = [
+    prompt.systemMessage,
+    { role: 'user', content: prompt.userMessage },
+  ];
 
   if (prompt.assistantMessage) {
-    messages.push({ role: 'assistant' as ChatRole, content: prompt.assistantMessage });
+    messages.push({ role: 'assistant', content: prompt.assistantMessage });
   }
 
   return await exponentialBackoff(
@@ -68,7 +72,7 @@ export async function generateChatResponse(
         return {
           content: response.choices[0].message.content || '',
           totalTokens: response.usage?.total_tokens || 0,
-          role: 'assistant' as ChatRole,
+          role: 'assistant',
         };
       } catch (error) {
         console.error('Error generating chat response:', error);

@@ -1,19 +1,31 @@
-'use client'
+'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
-import { cn } from '@/lib/utils'
-import { formatDistanceToNow } from 'date-fns'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import { Pencil, Trash2, X, Check, MessageSquare, Download, FileText, Image as ImageIcon, Film, Music, File } from 'lucide-react'
-import { useSupabase } from '@/components/providers/supabase-provider'
-import { supabase } from '@/lib/supabase'
-import { toast } from 'sonner'
-import { MessageReactions } from './message-reactions'
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
+import { formatDistanceToNow } from 'date-fns';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import {
+  Pencil,
+  Trash2,
+  X,
+  Check,
+  MessageSquare,
+  Download,
+  FileText,
+  Image as ImageIcon,
+  Film,
+  Music,
+  File,
+} from 'lucide-react';
+import { useSupabase } from '@/components/providers/supabase-provider';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
+import { MessageReactions } from './message-reactions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,51 +36,51 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
-import Link from 'next/link'
-import Image from 'next/image'
+} from '@/components/ui/alert-dialog';
+import Link from 'next/link';
+import Image from 'next/image';
 
 interface FileAttachment {
-  id: string
-  name: string
-  size: number
-  type: string
-  url: string
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  url: string;
 }
 
 interface MessageProps {
-  id: string
-  content: string
-  username: string
-  avatarUrl?: string
-  createdAt: Date
-  userId: string
-  channelId: string
-  files: FileAttachment[] | null
-  className?: string
-  onDelete?: (messageId: string) => void
-  onReply?: (messageId: string, event: React.MouseEvent<HTMLButtonElement>) => void
+  id: string;
+  content: string;
+  username: string;
+  avatarUrl?: string;
+  createdAt: Date;
+  userId: string;
+  channelId: string;
+  files: FileAttachment[] | null;
+  className?: string;
+  onDelete?: (messageId: string) => void;
+  onReply?: (messageId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
 // Helper function to format file size
 const formatFileSize = (bytes: number) => {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
-}
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+};
 
 // Helper function to get file icon
 const getFileIcon = (type: string) => {
-  if (type.startsWith('image/')) return ImageIcon
-  if (type.startsWith('video/')) return Film
-  if (type.startsWith('audio/')) return Music
-  if (type === 'application/pdf' || type.includes('document')) return FileText
-  return File
-}
+  if (type.startsWith('image/')) return ImageIcon;
+  if (type.startsWith('video/')) return Film;
+  if (type.startsWith('audio/')) return Music;
+  if (type === 'application/pdf' || type.includes('document')) return FileText;
+  return File;
+};
 
-export function Message({ 
+export function Message({
   id,
   content,
   username,
@@ -79,33 +91,35 @@ export function Message({
   files = null,
   className,
   onDelete,
-  onReply
+  onReply,
 }: MessageProps) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [editedContent, setEditedContent] = useState(content)
-  const [replyCount, setReplyCount] = useState(0)
-  const [isHighlighted, setIsHighlighted] = useState(false)
-  const { supabase } = useSupabase()
-  const [currentUser, setCurrentUser] = useState<string | null>(null)
-  const searchParams = useSearchParams()
-  const isCurrentUser = currentUser === userId
-  const messageRef = useRef<HTMLDivElement>(null)
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState(content);
+  const [replyCount, setReplyCount] = useState(0);
+  const [isHighlighted, setIsHighlighted] = useState(false);
+  const { supabase } = useSupabase();
+  const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const isCurrentUser = currentUser === userId;
+  const messageRef = useRef<HTMLDivElement>(null);
 
   const getUser = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    setCurrentUser(user?.id ?? null)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    setCurrentUser(user?.id ?? null);
   }, [supabase.auth]);
 
   useEffect(() => {
-    getUser()
+    getUser();
   }, [getUser]);
 
   // Handle message highlighting and reply thread
   useEffect(() => {
-    const messageId = searchParams.get('messageId')
-    const fileId = searchParams.get('fileId')
-    const replyId = searchParams.get('replyId')
-    
+    const messageId = searchParams.get('messageId');
+    const fileId = searchParams.get('fileId');
+    const replyId = searchParams.get('replyId');
+
     console.log('Highlight check:', {
       messageId,
       currentMessageId: id,
@@ -113,26 +127,25 @@ export function Message({
       files,
       matches: {
         messageMatch: messageId === id,
-        fileMatch: fileId && files?.some?.(file => file.id === fileId)
-      }
-    })
-    
-    const shouldHighlight = 
-      messageId === id || 
-      (fileId && files?.some?.(file => file.id === fileId))
-      
+        fileMatch: fileId && files?.some?.((file) => file.id === fileId),
+      },
+    });
+
+    const shouldHighlight =
+      messageId === id || (fileId && files?.some?.((file) => file.id === fileId));
+
     if (shouldHighlight) {
-      setIsHighlighted(true)
+      setIsHighlighted(true);
       // Scroll the message into view with a smooth animation
       messageRef.current?.scrollIntoView({
         behavior: 'smooth',
-        block: 'center'
-      })
+        block: 'center',
+      });
       // Remove highlight after animation
-      const timeout = setTimeout(() => setIsHighlighted(false), 20000)
-      return () => clearTimeout(timeout)
+      const timeout = setTimeout(() => setIsHighlighted(false), 20000);
+      return () => clearTimeout(timeout);
     }
-  }, [id, files, searchParams])
+  }, [id, files, searchParams]);
 
   // Load reply count
   useEffect(() => {
@@ -140,37 +153,37 @@ export function Message({
       const { count, error } = await supabase
         .from('messages')
         .select('id', { count: 'exact', head: true })
-        .eq('parent_id', id)
+        .eq('parent_id', id);
 
       if (error) {
-        console.error('Error loading reply count:', error)
-        return
+        console.error('Error loading reply count:', error);
+        return;
       }
 
-      setReplyCount(count || 0)
-    }
+      setReplyCount(count || 0);
+    };
 
-    loadReplyCount()
-  }, [id])
+    loadReplyCount();
+  }, [id, supabase]);
 
   const handleEdit = async () => {
-    if (!editedContent.trim()) return
+    if (!editedContent.trim()) return;
 
     try {
       const { error } = await supabase
         .from('messages')
         .update({ content: editedContent.trim() })
         .eq('id', id)
-        .eq('user_id', currentUser)
+        .eq('user_id', currentUser);
 
-      if (error) throw error
+      if (error) throw error;
 
-      setIsEditing(false)
+      setIsEditing(false);
     } catch (error) {
-      console.error('Error updating message:', error)
-      toast.error('Failed to update message. Please try again.')
+      console.error('Error updating message:', error);
+      toast.error('Failed to update message. Please try again.');
     }
-  }
+  };
 
   const handleDelete = async () => {
     try {
@@ -178,23 +191,23 @@ export function Message({
         .from('messages')
         .delete()
         .eq('id', id)
-        .eq('user_id', currentUser)
+        .eq('user_id', currentUser);
 
-      if (error) throw error
+      if (error) throw error;
 
-      onDelete?.(id)
+      onDelete?.(id);
     } catch (error) {
-      console.error('Error deleting message:', error)
-      toast.error('Failed to delete message. Please try again.')
+      console.error('Error deleting message:', error);
+      toast.error('Failed to delete message. Please try again.');
     }
-  }
+  };
 
   return (
-    <div 
+    <div
       ref={messageRef}
       className={cn(
-        "flex gap-3 p-4 hover:bg-muted/50 transition-colors group relative",
-        isHighlighted && "animate-highlight",
+        'flex gap-3 p-4 hover:bg-muted/50 transition-colors group relative',
+        isHighlighted && 'animate-highlight',
         className
       )}
     >
@@ -225,12 +238,7 @@ export function Message({
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    title="Delete message"
-                  >
+                  <Button variant="ghost" size="icon" className="h-6 w-6" title="Delete message">
                     <Trash2 className="h-3 w-3" />
                   </Button>
                 </AlertDialogTrigger>
@@ -263,8 +271,8 @@ export function Message({
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  setIsEditing(false)
-                  setEditedContent(content)
+                  setIsEditing(false);
+                  setEditedContent(content);
                 }}
               >
                 <X className="h-4 w-4 mr-1" />
@@ -282,15 +290,13 @@ export function Message({
           </div>
         ) : (
           <div className="text-sm prose prose-sm dark:prose-invert max-w-none">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {content}
-            </ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
             {files && files.length > 0 && (
               <div className="mt-2 space-y-2">
                 {files.map((file) => {
-                  const FileIcon = getFileIcon(file.type)
-                  const isImage = file.type.startsWith('image/')
-                  
+                  const FileIcon = getFileIcon(file.type);
+                  const isImage = file.type.startsWith('image/');
+
                   return (
                     <div
                       key={file.name}
@@ -314,11 +320,7 @@ export function Message({
                               {formatFileSize(file.size)}
                             </p>
                           </div>
-                          <a
-                            href={file.url}
-                            download={file.name}
-                            className="shrink-0"
-                          >
+                          <a href={file.url} download={file.name} className="shrink-0">
                             <Button
                               variant="ghost"
                               size="icon"
@@ -331,22 +333,18 @@ export function Message({
                         </div>
                       )}
                     </div>
-                  )
+                  );
                 })}
               </div>
             )}
             <div className="flex items-center gap-2">
-              <MessageReactions
-                messageId={id}
-                channelId={channelId}
-                className="mt-2"
-              />
+              <MessageReactions messageId={id} channelId={channelId} className="mt-2" />
               <Button
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  "h-6 px-2 text-sm opacity-0 group-hover:opacity-100 transition-opacity",
-                  "hover:bg-muted/80 dark:hover:bg-muted/50"
+                  'h-6 px-2 text-sm opacity-0 group-hover:opacity-100 transition-opacity',
+                  'hover:bg-muted/80 dark:hover:bg-muted/50'
                 )}
                 onClick={(e) => onReply?.(id, e)}
               >
@@ -368,5 +366,5 @@ export function Message({
         )}
       </div>
     </div>
-  )
-} 
+  );
+}
