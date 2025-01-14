@@ -1,10 +1,16 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { rateLimit } from './middleware/rate-limit';
 
-// Temporarily disabled authentication middleware
-export async function middleware() {
-  return NextResponse.next()
+export function middleware(request: NextRequest) {
+  // Only apply rate limiting to AI endpoints
+  if (request.nextUrl.pathname.startsWith('/api/ai/')) {
+    return rateLimit(request);
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
-} 
+  matcher: '/api/ai/:path*',
+};

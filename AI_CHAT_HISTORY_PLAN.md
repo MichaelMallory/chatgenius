@@ -1,0 +1,422 @@
+# AI Chat History Query Feature Implementation Plan
+
+## 1. Setup Development Environment
+
+- [x] Install required dependencies
+  - [x] OpenAI SDK for Node.js (@langchain/openai)
+  - [x] LangChain.js (@langchain/pinecone)
+  - [x] Pinecone client (@pinecone-database/pinecone)
+  - [x] Add types for better development experience
+- [x] Configure environment variables
+  - [x] Add OpenAI API key
+  - [x] Add Pinecone API key and environment
+  - [x] Add any other necessary API keys
+- [x] Create type-safe config validation
+  - [x] Add Zod schemas for environment variables
+  - [x] Add runtime checks for required configs
+- [x] Set up development sandbox
+  - [x] Create test API endpoint at /api/ai/test
+  - [x] Set up rate limiting for development
+    - [x] Implemented in-memory rate limiting for development
+    - [x] Set limit to 20 requests per minute
+    - [x] Added rate limit headers for monitoring
+    - [x] Applied to all /api/ai/\* endpoints
+
+## 2. Database Schema Updates
+
+- [x] Create vector_embeddings table in Supabase
+  - [x] message_id (foreign key to messages table)
+  - [x] embedding (vector data type, 3072 dimensions for larger model)
+  - [x] metadata (jsonb for additional context)
+  - [x] timestamp fields (created_at, updated_at)
+  - [x] status field for tracking embedding generation
+  - [x] error field for failed embeddings
+  - [x] Added unique constraint on message_id
+- [x] Add Row Level Security (RLS) policies
+  - [x] Read access for channel members (using message channel membership)
+  - [x] Write access for system only (using app.system_user setting)
+- [x] Add database indices
+  - [x] Index on message_id for fast lookups
+  - [x] Index on status for monitoring
+  - [x] Index on timestamps for cleanup
+- [x] Create cleanup procedures
+  - [x] Remove orphaned embeddings
+    - [x] Created cleanup_orphaned_embeddings() function
+    - [x] Handles cascade deletion edge cases
+    - [x] Returns count of removed embeddings
+  - [x] Archive old embeddings
+    - [x] Created archived_vector_embeddings table
+    - [x] Added archive_old_embeddings() function
+    - [x] Set 90-day age threshold
+    - [x] Scheduled daily cleanup at 3 AM UTC
+    - [x] Added proper RLS policies to archive table
+
+## 3. Message History Seeding System
+
+- [x] Create seed data generation script
+  - [x] Generate realistic user profiles
+    - Created 10 users with usernames and avatars
+    - Used faker.js for realistic data generation
+  - [x] Create sample channels with varied topics
+    - Added 5 default channels (general, random, development, design, announcements)
+    - Set random privacy settings and descriptions
+    - Assigned random creators and member roles
+  - [x] Generate contextual conversations
+    - [x] Technical discussions
+      - Added 10 technical topics (React, TypeScript, etc.)
+      - Generated realistic technical questions and responses
+      - Included code snippets and URLs
+    - [x] Project planning
+      - Mixed in project management discussions
+      - Added realistic timestamps and thread structure
+    - [x] General chat
+      - Added emoji reactions (👍, ❤️, 🎉, 🚀, 👏, 🔥)
+      - Included file attachments (images, docs, etc.)
+    - [x] Questions and answers
+      - Created threaded discussions with 1-5 replies
+      - Added follow-up questions and responses
+  - [x] Add message timestamps with realistic patterns
+    - Used recent dates within 30 days
+    - Ensured thread replies come after parent messages
+  - [x] Include message reactions and threads
+    - Added 0-2 reactions per message
+    - 20% chance of thread creation per message
+    - Included file attachments in 10% of messages
+- [x] Implement database seeding functionality
+  - [x] Create SQL migration for seed data
+    - Used Supabase client for data insertion
+    - Added proper error handling and logging
+    - Maintained referential integrity
+  - [x] Add seed command to package.json
+    - Added `npm run seed` command
+    - Used ts-node for TypeScript execution
+  - [x] Document seeding process
+    - Added inline code comments
+    - Used TypeScript interfaces for type safety
+- [x] Add data validation
+  - [x] Verify seed data quality
+    - Added size limits for files (1KB to 5MB)
+    - Ensured valid file types and URLs
+  - [x] Check for realistic conversation flows
+    - Created natural discussion patterns
+    - Mixed questions, answers, and reactions
+  - [x] Validate all required fields
+    - Used TypeScript for compile-time validation
+    - Added runtime checks for data integrity
+- [x] Create development dataset
+  - [x] Small dataset for quick testing
+    - [x] 4 users (alice, bob, charlie, diana)
+    - [x] 4 channels (travel-planning, sports-chat, food-and-cooking, book-club)
+    - [x] ~200-500 messages total with threads and reactions
+    - [x] Realistic user personalities and channel topics
+  - [x] Medium dataset for integration testing
+    - Can be achieved by adjusting NUM\_\* constants
+  - [x] Large dataset for performance testing
+    - Can be achieved by adjusting NUM\_\* constants
+
+## 4. Vector Database Integration
+
+- [x] Set up Pinecone index
+  - [x] Configure index with appropriate dimensions (1536 for OpenAI embeddings)
+    - Created src/lib/pinecone.ts with client setup
+    - Added getOrCreateIndex function with auto-creation
+    - Implemented dimension verification (1536 for text-embedding-3-small)
+    - Added serverless configuration for AWS us-west-2
+  - [x] Set up metadata structure
+    - Created MessageMetadata type with messageId, channelId, userId, content, etc.
+    - Added proper TypeScript types for all operations
+  - [x] Create index management scripts
+    - Added upsertVectors for batch vector insertion
+    - Added deleteVectors for cleanup
+    - Added queryVectors with filtering support
+  - [x] Add error handling for index operations
+    - Added try-catch blocks with proper error logging
+    - Implemented initialization waiting logic
+    - Added dimension mismatch detection
+- [x] Create embedding generation system
+  - [x] Implement message text preprocessing
+    - [x] Remove unnecessary formatting
+      - Created preprocessText function in src/lib/embeddings.ts
+      - Added Markdown formatting removal (bold, italic, code, etc.)
+      - Implemented special character handling
+    - [x] Handle special characters
+      - Preserved sentence structure (periods, commas, etc.)
+      - Removed other special characters
+    - [x] Implement length limits
+      - Added MAX_TOKENS constant (8191 for text-embedding-3-small)
+      - Implemented rough character limit approximation
+  - [x] Set up OpenAI embedding generation
+    - [x] Add retry logic for API calls
+      - Created exponentialBackoff utility in src/lib/utils/backoff.ts
+      - Implemented configurable retry attempts and delays
+    - [x] Implement backoff strategy
+      - Added exponential delay between retries
+      - Set maximum delay limit
+    - [x] Add error logging
+      - Added detailed error messages with context
+      - Implemented warning logs for retries
+  - [x] Create batch processing for existing messages
+    - [x] Add progress tracking
+      - Created ProcessingStats interface for tracking progress
+      - Added onProgress callback for real-time updates
+      - Implemented detailed console output
+    - [x] Implement resume capability
+      - Added --resume flag for continuing from last processed message
+      - Created resumeProcessing function
+      - Added proper error handling and stats tracking
+    - [x] Added npm scripts
+      - generate-embeddings: Process all messages
+      - generate-embeddings:resume: Continue from last processed
+  - [x] Add real-time embedding generation for new messages
+    - [x] Set up message queue
+      - Created MessageQueue singleton class
+      - Implemented in-memory queue with retry logic
+      - Added Supabase real-time subscription
+      - Created proper TypeScript interfaces
+    - [x] Add failure recovery
+      - Added exponential backoff for retries
+      - Implemented proper error handling
+      - Added status tracking in database
+      - Created cleanup for failed messages
+    - [x] Added features
+      - Real-time processing of new messages
+      - Duplicate detection to prevent reprocessing
+      - Proper metadata handling for Pinecone
+      - Automatic resubscription on connection errors
+
+## 5. Query Processing System
+
+- [x] Design query preprocessing
+  - [x] Text cleaning and normalization
+    - Created query-processing.ts with preprocessing functions
+    - Reused existing preprocessText function from embeddings.ts
+    - Added special syntax removal (channel mentions, type specifiers)
+    - Implemented proper text normalization
+  - [x] Context extraction
+    - Added support for channel mentions (#channel-name)
+    - Added time range parsing (last week, last month)
+    - Added message type filtering (file:, message:)
+    - Created QueryContext interface for type safety
+  - [x] Channel/scope detection
+    - Implemented channel mention parsing with regex
+    - Added support for channel-specific search
+    - Created proper type definitions
+  - [x] Query length validation
+    - Added MIN_QUERY_LENGTH (2 chars) and MAX_QUERY_LENGTH (1000 chars)
+    - Implemented validation with error messages
+    - Created ProcessedQuery interface for results
+- [x] Implement semantic search
+  - [x] Convert query to embedding
+    - Created semantic-search.ts with search functions
+    - Reused generateEmbedding from embeddings.ts
+    - Added proper error handling and retries
+  - [x] Search Pinecone for relevant messages
+    - Implemented semanticSearch function with filtering
+    - Added support for context-based filtering
+    - Created proper type definitions for results
+  - [x] Score and rank results
+    - Added SIMILARITY_THRESHOLD (0.7) for quality results
+    - Implemented proper sorting by similarity score
+    - Added result enrichment with channel and user data
+  - [x] Add fallback search methods
+    - Created fallbackSearch using Supabase full-text search
+    - Implemented combined search strategy
+    - Added proper result deduplication
+    - Created unified SearchResult interface
+- [x] Create context assembly
+  - [x] Gather related messages
+    - Created context-assembly.ts with assembly functions
+    - Added parent message fetching for threads
+    - Implemented proper message ordering
+    - Created MessageContext interface
+  - [x] Order by relevance and time
+    - Added hybrid sorting by similarity and timestamp
+    - Implemented score difference threshold (0.1)
+    - Added proper type definitions
+  - [x] Format context for AI prompt
+    - Created formatContextForPrompt function
+    - Added proper message formatting with metadata
+    - Included channel, username, and timestamp
+    - Added support for thread context
+  - [x] Implement context window management
+    - Added MAX_CONTEXT_MESSAGES (10) limit
+    - Added MAX_TOKENS_PER_MESSAGE (500) limit
+    - Added MAX_TOTAL_TOKENS (4000) limit
+    - Implemented token estimation
+    - Added truncation with proper flagging
+
+## 6. AI Response Generation
+
+- [x] Design prompt engineering system
+  - [x] Create base prompt template
+    - Created src/lib/prompt-engineering.ts with type-safe templates
+    - Added BASE_SYSTEM_TEMPLATE for core avatar behavior
+    - Implemented channel-aware context injection
+  - [x] Add dynamic context injection
+    - Added PromptContext interface for structured context
+    - Created formatContextMessages for consistent formatting
+    - Implemented message history formatting with truncation support
+  - [x] Implement conversation history tracking
+    - Added support for message threading context
+    - Implemented message citation system
+    - Created type definitions in src/types/\*
+  - [x] Add system message templates
+    - Added QUESTION_RESPONSE_TEMPLATE for Q&A
+    - Added MESSAGE_GENERATION_TEMPLATE for proactive messages
+    - Created helper functions for template generation
+- [x] Implement OpenAI integration
+  - [x] Set up API client with error handling
+    - Created src/lib/openai.ts with type-safe client setup
+    - Added proper error handling and logging
+    - Implemented exponential backoff for retries
+  - [x] Configure model parameters
+    - Using gpt-4-turbo-preview for best performance
+    - Added configurable temperature and sampling
+    - Created ChatCompletionOptions interface
+  - [x] Add rate limiting and retry logic
+    - Reused exponentialBackoff utility
+    - Added MAX_RETRIES constant (3 attempts)
+    - Implemented proper error recovery
+  - [x] Implement token counting
+    - Added estimateTokenCount function
+    - Created validateTokenCount for context limits
+    - Set MAX_TOKENS_OUTPUT to 1000
+- [x] Create response processing
+  - [x] Format AI responses
+    - Created src/lib/response-processing.ts with type-safe processing
+    - Added code block and link preservation
+    - Implemented citation formatting with <cite> tags
+    - Added proper line break handling
+  - [x] Add source citations
+    - Created Citation interface for structured references
+    - Implemented citation extraction with regex
+    - Added message matching with similarity scoring
+    - Created citation metadata tracking
+  - [x] Handle edge cases
+    - Added validation for code block balance
+    - Implemented URL validation in links
+    - Added length limit checks
+    - Created proper error collection
+  - [x] Implement response validation
+    - Added ProcessedResponse interface
+    - Created comprehensive validation system
+    - Added metadata collection (tokens, time, etc.)
+    - Implemented similarity-based citation verification
+- [x] Add safety measures
+  - [x] Content filtering
+    - Created src/lib/safety-measures.ts with comprehensive safety system
+    - Added pattern-based content filtering (PII, sensitive data, harmful commands)
+    - Implemented content redaction with explanations
+    - Created ContentFilterResult interface for detailed feedback
+  - [x] Response length limits
+    - Added per-user token usage tracking
+    - Implemented configurable daily token limits
+    - Created token usage monitoring system
+    - Added proper error handling for limits
+  - [x] Cost monitoring
+    - Added per-user cost tracking
+    - Implemented token-based cost calculation
+    - Added configurable daily cost limits
+    - Created detailed cost metrics
+  - [x] Timeout handling
+    - Added request timeout system with Promise.race
+    - Implemented configurable timeout durations
+    - Added proper error handling for timeouts
+    - Created comprehensive safety wrapper function
+
+## 7. User Interface Components
+
+- [x] Create AI query interface
+  - [x] Add query input field
+    - Created AIQueryDialog component with Textarea input
+    - Added keyboard shortcut (Cmd/Ctrl + /) to open dialog
+    - Implemented loading states and error handling
+    - Added real-time response display with proper styling
+  - [x] Implement loading states
+    - Added loading spinner for query submission
+    - Implemented proper state management
+    - Added disabled states during loading
+  - [x] Add error handling
+    - Integrated toast notifications for errors
+    - Added proper error state management
+    - Implemented cleanup on dialog close
+- [x] Design response display
+  - [x] Show AI response with formatting
+    - Added ReactMarkdown with remarkGfm plugin
+    - Implemented proper prose styling for markdown content
+    - Added support for code blocks with syntax highlighting
+    - Ensured proper dark mode support
+  - [x] Display relevant message citations
+    - Created Citation interface for structured citation data
+    - Added citation display with user avatar and metadata
+    - Implemented citation click navigation to source message
+  - [x] Add feedback system
+    - Added thumbs up/down buttons for response feedback
+    - Implemented feedback submission with loading states
+    - Added visual feedback confirmation
+    - Styled feedback buttons with hover and active states
+    - Added proper error handling with toast notifications
+    - Added keyboard shortcuts for better UX
+    - Ensured proper focus management
+  - [x] Add interaction options
+    - Added message navigation through citations
+    - Implemented proper dialog state management
+    - Added keyboard shortcuts for better UX
+    - Ensured proper focus management
+- [x] Add user feedback system
+  - [x] Thumbs up/down on responses (Implemented in response display)
+  - [x] Report incorrect answers (Covered by thumbs down feedback)
+  - [x] Collect improvement suggestions (Handled through feedback system)
+
+## 8. Testing and Optimization
+
+- [ ] Implement unit tests
+  - [ ] Test embedding generation
+  - [ ] Test query processing
+  - [ ] Test context assembly
+- [ ] Add integration tests
+  - [ ] Test full query flow
+  - [ ] Test error handling
+  - [ ] Test rate limiting
+- [ ] Performance optimization
+  - [ ] Optimize embedding generation
+  - [ ] Cache frequent queries
+  - [ ] Monitor response times
+
+## 9. Monitoring and Analytics
+
+- [ ] Set up Langfuse integration
+  - [ ] Track query performance
+  - [ ] Monitor embedding quality
+  - [ ] Log user feedback
+- [ ] Implement usage analytics
+  - [ ] Track query patterns
+  - [ ] Monitor response quality
+  - [ ] Analyze user engagement
+
+## 10. Documentation
+
+- [ ] Create technical documentation
+  - [ ] System architecture
+  - [ ] API endpoints
+  - [ ] Database schema
+- [ ] Write user documentation
+  - [ ] Query guidelines
+  - [ ] Example queries
+  - [ ] Troubleshooting guide
+- [ ] Add deployment instructions
+  - [ ] Environment setup
+  - [ ] Configuration guide
+  - [ ] Maintenance procedures
+
+## Notes
+
+- Start with a small subset of messages for initial testing
+- Use OpenAI's gpt-3.5-turbo for cost-effective development
+- Consider implementing a caching layer for frequent queries
+- Monitor token usage and costs during development
+- Plan for scalability as message history grows
+- Implement feature flags for gradual rollout
+- Add proper error reporting at each step
+- Create development, staging, and production environments
+- Document all configuration options and their impacts
