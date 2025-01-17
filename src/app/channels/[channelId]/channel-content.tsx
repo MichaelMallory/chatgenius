@@ -26,10 +26,22 @@ interface Profile {
 }
 
 // Separate client component for messages
-function ChannelMessages({ channelId }: { channelId: string }) {
+function ChannelMessages({
+  channelId,
+  threadView,
+  onThreadViewChange,
+}: {
+  channelId: string;
+  threadView?: { messageId: string } | null;
+  onThreadViewChange?: (threadView: { messageId: string } | null) => void;
+}) {
   return (
     <div className="flex-1 overflow-y-auto">
-      <MessageList channelId={channelId} />
+      <MessageList
+        channelId={channelId}
+        threadView={threadView}
+        onThreadViewChange={onThreadViewChange}
+      />
     </div>
   );
 }
@@ -40,6 +52,7 @@ export function ChannelContent({ channelId }: { channelId: string }) {
   const [otherUser, setOtherUser] = useState<Profile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [threadView, setThreadView] = useState<{ messageId: string } | null>(null);
   const { supabase, user } = useSupabase();
   const router = useRouter();
 
@@ -220,7 +233,11 @@ export function ChannelContent({ channelId }: { channelId: string }) {
           )}
         </CardHeader>
         <CardContent className="flex flex-col h-[calc(100vh-12rem)]">
-          <ChannelMessages channelId={channelId} />
+          <ChannelMessages
+            channelId={channelId}
+            threadView={threadView}
+            onThreadViewChange={setThreadView}
+          />
           <MessageInput channelId={channelId} className="pt-4" />
         </CardContent>
       </Card>

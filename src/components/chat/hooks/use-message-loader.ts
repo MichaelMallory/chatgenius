@@ -175,8 +175,15 @@ export function useMessageLoader(channelId: string) {
           }
 
           const totalMessages = count || 0;
+          // Calculate the range for the next batch of messages
           const startIndex = Math.max(0, totalMessages - MESSAGES_PER_BATCH - offset);
-          const endIndex = totalMessages - offset - 1;
+          const endIndex = Math.max(0, totalMessages - offset - 1);
+
+          if (startIndex >= endIndex) {
+            setHasMore(false);
+            setIsInitialLoading(false);
+            return;
+          }
 
           query = query.range(startIndex, endIndex);
         }
@@ -219,11 +226,11 @@ export function useMessageLoader(channelId: string) {
           setFocusedMessageId(messageId);
         } else if (offset === 0) {
           setMessages(formattedMessages);
+          setHasMore(formattedMessages.length >= MESSAGES_PER_BATCH);
         } else {
           setMessages((prev) => [...formattedMessages, ...prev]);
+          setHasMore(formattedMessages.length >= MESSAGES_PER_BATCH);
         }
-
-        setHasMore(!messageId && offset === 0);
       } catch (err) {
         if (isMounted.current && currentLoadRef.current === loadId) {
           console.error('[MessageLoader] Unexpected error:', err);

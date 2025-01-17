@@ -9,8 +9,9 @@ import { useMessageLoader } from './hooks/use-message-loader';
 import { useMessageScroll } from './hooks/use-message-scroll';
 import { useSupabase } from '@/components/providers/supabase-provider';
 import { subscriptionManager } from '@/lib/subscription-manager';
+import { ThreadView } from './thread-view';
 
-export function MessageList({ channelId }: MessageListProps) {
+export function MessageList({ channelId, threadView, onThreadViewChange }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
   const focusedMessageRef = useRef<HTMLDivElement>(null);
@@ -54,8 +55,11 @@ export function MessageList({ channelId }: MessageListProps) {
 
   // Handle scroll to load more messages
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop } = e.currentTarget;
-    if (scrollTop === 0 && !isLoadingMore && hasMore) {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+
+    // Check if we're near the top (within 100px) and have more messages to load
+    const isNearTop = scrollTop < 100;
+    if (isNearTop && !isLoadingMore && hasMore) {
       const oldScrollHeight = e.currentTarget.scrollHeight;
       loadMoreMessages().then(() => {
         // After loading more messages, restore scroll position
@@ -67,7 +71,6 @@ export function MessageList({ channelId }: MessageListProps) {
     }
 
     // Update auto-scroll behavior based on scroll position
-    const { scrollHeight, clientHeight } = e.currentTarget;
     const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
     setShouldScrollToBottom(isNearBottom);
   };
@@ -142,6 +145,10 @@ export function MessageList({ channelId }: MessageListProps) {
     };
   }, [channelId, supabase, addMessage]);
 
+  const handleReply = (messageId: string) => {
+    onThreadViewChange?.({ messageId });
+  };
+
   if (error) {
     return (
       <div className="flex-1 flex items-center justify-center p-4">
@@ -184,6 +191,7 @@ export function MessageList({ channelId }: MessageListProps) {
                   channelId={message.channel_id}
                   files={message.files}
                   onDelete={() => deleteMessage(message.id)}
+                  onReply={handleReply}
                 />
               </div>
             ))}
@@ -200,6 +208,15 @@ export function MessageList({ channelId }: MessageListProps) {
             </Button>
           )}
         </>
+      )}
+      {threadView && (
+        <div className="fixed inset-y-0 right-0 w-96 bg-background border-l">
+          <ThreadView
+            parentMessageId={threadView.messageId}
+            channelId={channelId}
+            onClose={() => onThreadViewChange?.(null)}
+          />
+        </div>
       )}
     </div>
   );

@@ -26,4 +26,8 @@ export interface ThreadPosition {
 
 export interface MessageListProps {
   channelId: string;
+  threadView?: {
+    messageId: string;
+  } | null;
+  onThreadViewChange?: (threadView: { messageId: string } | null) => void;
 }
