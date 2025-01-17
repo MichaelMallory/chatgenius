@@ -21,19 +21,22 @@ export function ChannelProvider() {
   const fetchChannels = useCallback(async () => {
     try {
       setIsLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
       // First, ensure user is member of general channel
-      const { error: membershipError } = await supabase
-        .from('user_channels')
-        .upsert({
+      const { error: membershipError } = await supabase.from('user_channels').upsert(
+        {
           user_id: user.id,
           channel_id: '00000000-0000-0000-0000-000000000000',
-          role: 'member'
-        }, {
-          onConflict: 'user_id,channel_id'
-        });
+          role: 'member',
+        },
+        {
+          onConflict: 'user_id,channel_id',
+        }
+      );
 
       if (membershipError && Object.keys(membershipError).length > 0) {
         console.warn('Warning: Issue with general channel membership:', membershipError);
@@ -42,8 +45,9 @@ export function ChannelProvider() {
       // Fetch all accessible channels
       const { data: channelsData, error: channelsError } = await supabase
         .from('channels')
-        .select('*')
+        .select('*, user_channels!inner(*)')
         .eq('is_direct_message', false)
+        .eq('user_channels.user_id', user.id)
         .order('name');
 
       if (channelsError) {
@@ -51,12 +55,8 @@ export function ChannelProvider() {
         throw channelsError;
       }
 
-      // Filter channels based on access rules
-      const accessibleChannels = channelsData.filter(channel => 
-        !channel.is_private || 
-        channel.id === '00000000-0000-0000-0000-000000000000' ||
-        channel.created_by === user.id
-      );
+      // Filter out the user_channels data from the response
+      const accessibleChannels = channelsData.map(({ user_channels, ...channel }) => channel);
 
       setChannels(accessibleChannels);
     } catch (error) {
@@ -68,7 +68,7 @@ export function ChannelProvider() {
   }, [supabase]);
 
   const handleChannelCreated = (newChannel: Channel) => {
-    setChannels(prevChannels => {
+    setChannels((prevChannels) => {
       // Add the new channel to the list and sort by name
       const updatedChannels = [...prevChannels, newChannel];
       return updatedChannels.sort((a, b) => a.name.localeCompare(b.name));
@@ -117,4 +117,4 @@ export function ChannelProvider() {
       <ChannelList channels={channels} isLoading={isLoading} />
     </div>
   );
-} 
+}

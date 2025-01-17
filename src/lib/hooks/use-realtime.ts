@@ -1,14 +1,14 @@
-import { useEffect } from 'react'
-import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
+import { useEffect, useMemo } from 'react';
+import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 
-type Table = 'messages' | 'channels' | 'reactions' | 'user_channels' | 'files' | 'profiles'
-type Event = 'INSERT' | 'UPDATE' | 'DELETE'
+type Table = 'messages' | 'channels' | 'reactions' | 'user_channels' | 'files' | 'profiles';
+type Event = 'INSERT' | 'UPDATE' | 'DELETE';
 
 interface UseRealtimeOptions {
-  event?: Event | '*'
-  filter?: string
-  schema?: string
+  event?: Event | '*';
+  filter?: string;
+  schema?: string;
 }
 
 export function useRealtime<T extends { [key: string]: any }>(
@@ -16,57 +16,43 @@ export function useRealtime<T extends { [key: string]: any }>(
   callback: (payload: RealtimePostgresChangesPayload<T>) => void,
   options: UseRealtimeOptions = {}
 ) {
+  const { event = '*', filter, schema = 'public' } = options;
+
+  // Memoize the options to prevent unnecessary re-renders
+  const channelOptions = useMemo(
+    () => ({
+      event,
+      schema,
+      table,
+      filter,
+    }),
+    [event, schema, table, filter]
+  );
+
   useEffect(() => {
-    const { event = '*', filter, schema = 'public' } = options
-    let channel: RealtimeChannel
+    let channel: RealtimeChannel;
 
     try {
-      console.log(`Setting up real-time subscription for ${table}:`, {
-        event,
-        filter,
-        schema
-      })
-
       channel = supabase
         .channel(`${table}_changes`)
-        .on<T>(
-          'postgres_changes' as any,
-          {
-            event,
-            schema,
-            table,
-            filter,
-          },
-          (payload: RealtimePostgresChangesPayload<T>) => {
-            console.log(`Received ${table} update:`, {
-              eventType: payload.eventType,
-              new: payload.new,
-              old: payload.old,
-              filter
-            })
-            callback(payload)
-          }
-        )
-        .subscribe((status) => {
-          console.log(`Subscription status for ${table}:`, status)
-        })
+        .on<T>('postgres_changes' as any, channelOptions, callback)
+        .subscribe();
     } catch (error) {
-      console.error(`Error subscribing to ${table}:`, error)
+      console.error(`Error subscribing to ${table}:`, error);
     }
 
     return () => {
       if (channel) {
-        console.log(`Cleaning up subscription for ${table}`)
-        supabase.removeChannel(channel)
+        channel.unsubscribe();
       }
-    }
-  }, [table, callback, options])
+    };
+  }, [table, callback, channelOptions]);
 }
 
 // Presence hook for user online status
 export function usePresence(channelId: string, userId: string) {
   useEffect(() => {
-    let channel: RealtimeChannel
+    let channel: RealtimeChannel;
 
     try {
       channel = supabase.channel(`presence_${channelId}`, {
@@ -75,30 +61,26 @@ export function usePresence(channelId: string, userId: string) {
             key: userId,
           },
         },
-      })
+      });
 
       channel
         .on('presence', { event: 'sync' }, () => {
-          const state = channel.presenceState()
-          console.log('Presence state:', state)
+          const state = channel.presenceState();
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Presence state:', state);
+          }
         })
-        .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-          console.log('Join:', key, newPresences)
-        })
-        .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-          console.log('Leave:', key, leftPresences)
-        })
-        .subscribe()
+        .subscribe();
     } catch (error) {
-      console.error('Error setting up presence:', error)
+      console.error('Error setting up presence:', error);
     }
 
     return () => {
       if (channel) {
-        supabase.removeChannel(channel)
+        supabase.removeChannel(channel);
       }
-    }
-  }, [channelId, userId])
+    };
+  }, [channelId, userId]);
 }
 
 // Example usage:
@@ -117,4 +99,4 @@ useRealtime<Message>('messages', (payload) => {
 
 // Track user presence in a channel
 usePresence(channelId, userId)
-*/ 
+*/

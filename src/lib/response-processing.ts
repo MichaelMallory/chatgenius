@@ -30,7 +30,7 @@ export interface ResponseMetadata {
 
 const MAX_RESPONSE_LENGTH = 2000; // characters
 const MIN_RESPONSE_LENGTH = 10; // characters
-const CITATION_PATTERN = /\[(.*?)\]/g; // Matches text in square brackets
+const CITATION_PATTERN = /\[(\d+)\]\s+@([^\s]+)\s+in\s+#([^\s:]+):\s*(.*?)(?=\n\[\d+\]|\n*$)/g;
 
 /**
  * Process and validate an AI response
@@ -62,53 +62,49 @@ export function processResponse(
 }
 
 /**
- * Extract citations from response content and link them to context messages
+ * Extract and validate citations from response content
  */
 function extractCitations(content: string, contextMessages: Message[]): Citation[] {
   const citations: Citation[] = [];
-  const [_, sourcesSection] = content.split(/^Sources:/m);
-
-  if (!sourcesSection) {
-    return citations;
-  }
-
-  // Track used message IDs to prevent duplicates
+  const citationMatches = content.matchAll(CITATION_PATTERN);
   const usedMessageIds = new Set<string>();
 
-  // Match citation numbers and content, improved regex to better handle multiline citations
-  const citationMatches = sourcesSection.matchAll(
-    /\[(\d+)\]\s+@?([^:]+):\s*((?:[^\n]|\n(?!\[))*)/g
-  );
-
   for (const match of citationMatches) {
-    const [_, number, _username, citedText] = match;
-    const citedMessage = findMessageByCitation(citedText.trim(), contextMessages);
+    const [_, index, username, channelName, citedContent] = match;
+    const messageIndex = parseInt(index) - 1;
 
-    if (citedMessage && !usedMessageIds.has(citedMessage.id)) {
-      // Verify we have the required user data
-      if (!citedMessage.user?.username) {
-        console.error('Missing username for message:', citedMessage.id);
-        continue;
-      }
-
-      usedMessageIds.add(citedMessage.id);
-      citations.push({
-        messageId: citedMessage.id,
-        content: citedMessage.content,
-        username: citedMessage.user.username,
-        timestamp: citedMessage.createdAt,
-        channelName: citedMessage.channel.name,
-        channelId: citedMessage.channel.id,
-        similarity: 1, // Always 1 since we only allow exact matches
-      });
+    if (messageIndex < 0 || messageIndex >= contextMessages.length) {
+      continue; // Skip invalid citation indices
     }
+
+    const contextMessage = contextMessages[messageIndex];
+    if (!contextMessage) continue;
+
+    // Verify the citation matches the context message
+    if (
+      contextMessage.user.username !== username ||
+      contextMessage.channel.name !== channelName ||
+      !contextMessage.content.includes(citedContent.trim())
+    ) {
+      continue; // Skip citations that don't match context
+    }
+
+    // Avoid duplicate citations of the same message
+    if (usedMessageIds.has(contextMessage.id)) continue;
+    usedMessageIds.add(contextMessage.id);
+
+    citations.push({
+      messageId: contextMessage.id,
+      content: citedContent.trim(),
+      username: contextMessage.user.username,
+      timestamp: new Date(contextMessage.createdAt),
+      channelName: contextMessage.channel.name,
+      channelId: contextMessage.channel.id,
+      similarity: 1.0, // Direct match from context
+    });
   }
 
-  return citations.sort((a, b) => {
-    const aIndex = contextMessages.findIndex((m) => m.id === a.messageId);
-    const bIndex = contextMessages.findIndex((m) => m.id === b.messageId);
-    return aIndex - bIndex;
-  });
+  return citations;
 }
 
 /**
@@ -141,28 +137,29 @@ function validateResponse(
 ): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
 
-  // Check response length
-  if (content.length < MIN_RESPONSE_LENGTH) {
-    errors.push('Response is too short');
-  }
-  if (content.length > MAX_RESPONSE_LENGTH) {
-    errors.push('Response exceeds maximum length');
-  }
-
-  // Check for Sources section
-  if (!content.includes('\n\nSources:')) {
-    errors.push('Response must include a Sources section');
-  }
-
-  // Check for empty or invalid citations
+  // Check for minimum citations
   if (citations.length === 0) {
-    errors.push('Response must include at least one valid citation');
+    errors.push('Response must include at least one citation from the chat history');
   }
 
-  // Check for code block balance
-  const codeBlockCount = (content.match(/```/g) || []).length;
-  if (codeBlockCount % 2 !== 0) {
-    errors.push('Unbalanced code blocks');
+  // Check for proper citation format
+  if (!content.includes('Sources:')) {
+    errors.push('Response must include a "Sources:" section');
+  }
+
+  // Check for citations outside the Sources section
+  const mainContent = content.split('Sources:')[0];
+  if (CITATION_PATTERN.test(mainContent)) {
+    errors.push('Citations should only appear in the Sources section');
+  }
+
+  // Check for proper citation formatting
+  const citationSection = content.split('Sources:')[1];
+  if (citationSection) {
+    const properFormat = /^\s*\[\d+\]\s+@[^\s]+\s+in\s+#[^\s:]+:/m;
+    if (!properFormat.test(citationSection)) {
+      errors.push('Citations must follow the format: [X] @username in #channel: content');
+    }
   }
 
   return {

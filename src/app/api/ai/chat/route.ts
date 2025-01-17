@@ -53,7 +53,6 @@ export async function POST(request: Request) {
       const searchResults = await semanticSearch({
         query: processedQuery,
         channelId,
-        limit: 10,
       });
 
       console.log('Search returned results:', searchResults.length);
@@ -166,24 +165,19 @@ export async function POST(request: Request) {
       const response = await generateChatResponse({
         systemMessage: {
           role: 'system',
-          content: `You are an AI assistant in the ChatGenius workspace. Your primary task is to provide comprehensive responses based on the chat history provided below.
+          content: `You are an AI assistant in the ChatGenius workspace. Your primary task is to provide comprehensive responses based ONLY on the chat history provided below.
 
 IMPORTANT INSTRUCTIONS:
-1. Provide complete, detailed responses that cover ALL relevant information from the chat history
-2. After your main response, ALWAYS include a "Sources:" section
-3. Under Sources, list EVERY message you referenced using [1], [2], etc.
-4. Format each source citation EXACTLY as: [X] @username in #channel: <exact message content>
-5. Make sure to cite ALL relevant messages that support your response
-6. Keep citations in the Sources section only, not in the main response
-7. Always include both the username (with @) and channel (with #) in each citation
-
-Example format:
-Here is my comprehensive response that covers all the relevant information from the chat history.
-
-Sources:
-[1] @alice in #general: Original message content here
-[2] @bob in #support: Another relevant message here
-[3] @charlie in #dev: More supporting evidence here
+1. ONLY reference information that is explicitly present in the chat history
+2. NEVER make up or assume information not present in the messages
+3. NEVER reference users or conversations that aren't in the provided context
+4. After your main response, ALWAYS include a "Sources:" section
+5. Under Sources, list EVERY message you referenced using [1], [2], etc.
+6. Format each source citation EXACTLY as: [X] @username in #channel: <exact message content>
+7. Make sure to cite ALL relevant messages that support your response
+8. Keep citations in the Sources section only, not in the main response
+9. Always include both the username (with @) and channel (with #) in each citation
+10. If there is insufficient context to answer fully, explicitly state what information is missing
 
 ${context}`,
         },

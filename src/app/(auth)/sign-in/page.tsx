@@ -1,60 +1,67 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { useSupabase } from '@/components/providers/supabase-provider'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { toast } from 'sonner'
-import { Github } from 'lucide-react'
-import Link from 'next/link'
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useSupabase } from '@/components/providers/supabase-provider';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { toast } from 'sonner';
+import { Github } from 'lucide-react';
+import Link from 'next/link';
 
 export default function SignInPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
-  const { supabase } = useSupabase()
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+  const { supabase } = useSupabase();
 
   const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
+    e.preventDefault();
+    setIsLoading(true);
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
-      })
+      });
 
-      if (error) throw error
+      if (error) throw error;
 
-      toast.success('Signed in successfully')
-      router.push('/channels/general')
+      toast.success('Signed in successfully');
+      router.push('/channels/00000000-0000-0000-0000-000000000001');
     } catch (error) {
-      console.error('Error signing in:', error)
-      toast.error('Failed to sign in')
+      console.error('Error signing in:', error);
+      toast.error('Failed to sign in');
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleGithubSignIn = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo: `${window.location.origin}/channels/general`,
+          redirectTo: `${window.location.origin}/channels/00000000-0000-0000-0000-000000000001`,
         },
-      })
+      });
 
-      if (error) throw error
+      if (error) throw error;
     } catch (error) {
-      console.error('Error signing in with GitHub:', error)
-      toast.error('Failed to sign in with GitHub')
+      console.error('Error signing in with GitHub:', error);
+      toast.error('Failed to sign in with GitHub');
     }
-  }
+  };
 
   return (
     <div className="container mx-auto flex items-center justify-center min-h-screen p-4">
@@ -90,11 +97,7 @@ export default function SignInPage() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isLoading}
-            >
+            <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? 'Signing in...' : 'Sign In'}
             </Button>
             <Button
@@ -117,5 +120,5 @@ export default function SignInPage() {
         </form>
       </Card>
     </div>
-  )
-} 
+  );
+}

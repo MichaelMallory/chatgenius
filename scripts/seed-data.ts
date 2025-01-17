@@ -1,23 +1,45 @@
-const { faker } = require('@faker-js/faker');
-const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config();
+import { faker } from '@faker-js/faker';
+import { createClient } from '@supabase/supabase-js';
+import { parseConversations } from './parse-conversations';
+import dotenv from 'dotenv';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+dotenv.config();
+
+// Verify environment variables
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  throw new Error(
+    'Missing required environment variables: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY'
+  );
+}
+
+// Verify service role key format
+if (!supabaseServiceKey.startsWith('eyJ') || supabaseServiceKey.length < 100) {
+  throw new Error('Invalid SUPABASE_SERVICE_ROLE_KEY format. Please check your .env file.');
+}
+
+// Create Supabase client with service role key
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+});
+
+// Add a helper function to wait
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Seed data configuration
 const NUM_USERS = 4;
 const NUM_CHANNELS = 4;
-const MESSAGES_PER_CHANNEL = 100;
 const REACTIONS_PER_MESSAGE = 1;
 const THREAD_PROBABILITY = 0.2;
 const FILE_PROBABILITY = 0.1;
 
 interface User {
   id: string;
-  email: string;
   username: string;
   avatar_url: string | null;
 }
@@ -106,118 +128,26 @@ const userPersonalities: Record<string, UserPersonality> = {
 interface ChannelTopic {
   name: string;
   description: string;
-  generateMessage: (username: string) => string;
 }
 
 const channelTopics: ChannelTopic[] = [
   {
     name: 'travel-planning',
     description: 'Discussing travel destinations and trip planning',
-    generateMessage: (username) => {
-      const destinations = [
-        'Bali',
-        'Japan',
-        'Iceland',
-        'New Zealand',
-        'Costa Rica',
-        'Italy',
-        'Greece',
-        'Thailand',
-      ];
-      const activities = [
-        'hiking',
-        'food tours',
-        'cultural experiences',
-        'adventure sports',
-        'relaxation',
-        'photography',
-      ];
-      const topics = [
-        `Has anyone been to ${faker.helpers.arrayElement(
-          destinations
-        )}? Looking for recommendations!`,
-        `I found great deals for ${faker.helpers.arrayElement(
-          destinations
-        )} during ${faker.helpers.arrayElement(['summer', 'winter', 'spring', 'fall'])}!`,
-        `The best part about ${faker.helpers.arrayElement(
-          destinations
-        )} was definitely the ${faker.helpers.arrayElement(activities)}.`,
-        `Planning a trip to ${faker.helpers.arrayElement(
-          destinations
-        )}. Any tips on ${faker.helpers.arrayElement(activities)}?`,
-        `Just booked tickets to ${faker.helpers.arrayElement(
-          destinations
-        )}! So excited about the ${faker.helpers.arrayElement(activities)}!`,
-      ];
-      return faker.helpers.arrayElement(topics);
-    },
   },
   {
     name: 'sports-chat',
     description: 'Sports discussion and game analysis',
-    generateMessage: (username) => {
-      const sports = ['basketball', 'football', 'soccer', 'tennis', 'baseball'];
-      const teams = ['Lakers', 'Warriors', 'Chiefs', 'Eagles', 'Manchester United', 'Liverpool'];
-      const topics = [
-        `What a game last night! ${faker.helpers.arrayElement(teams)} really showed up!`,
-        `Anyone watching the ${faker.helpers.arrayElement(sports)} finals?`,
-        `${faker.helpers.arrayElement(teams)} strategy this season has been interesting...`,
-        `Predictions for the ${faker.helpers.arrayElement(sports)} championship?`,
-        `The new player on ${faker.helpers.arrayElement(teams)} is really making a difference!`,
-      ];
-      return faker.helpers.arrayElement(topics);
-    },
   },
   {
     name: 'food-and-cooking',
     description: 'Recipe sharing and cooking discussions',
-    generateMessage: (username) => {
-      const cuisines = ['Italian', 'Japanese', 'Mexican', 'Indian', 'Thai', 'Mediterranean'];
-      const dishes = ['pasta', 'curry', 'tacos', 'sushi', 'salad', 'soup'];
-      const topics = [
-        `Just tried making ${faker.helpers.arrayElement(cuisines)} ${faker.helpers.arrayElement(
-          dishes
-        )}! Here's how it turned out...`,
-        `Looking for a good recipe for ${faker.helpers.arrayElement(
-          cuisines
-        )} ${faker.helpers.arrayElement(dishes)}`,
-        `Found this amazing ${faker.helpers.arrayElement(cuisines)} restaurant!`,
-        `Any tips for perfecting ${faker.helpers.arrayElement(dishes)}?`,
-        `Weekly meal prep featuring ${faker.helpers.arrayElement(cuisines)} dishes!`,
-      ];
-      return faker.helpers.arrayElement(topics);
-    },
   },
   {
     name: 'book-club',
     description: 'Book recommendations and discussions',
-    generateMessage: (username) => {
-      const genres = ['mystery', 'sci-fi', 'romance', 'non-fiction', 'fantasy'];
-      const activities = ['reading', 'book club meeting', 'author talk', 'library visit'];
-      const topics = [
-        `Currently reading a great ${faker.helpers.arrayElement(genres)} novel!`,
-        `Any recommendations for ${faker.helpers.arrayElement(genres)} books?`,
-        `Thoughts on the latest ${faker.helpers.arrayElement(genres)} bestseller?`,
-        `Planning our next ${faker.helpers.arrayElement(activities)}`,
-        `Just finished an amazing ${faker.helpers.arrayElement(genres)} book!`,
-      ];
-      return faker.helpers.arrayElement(topics);
-    },
   },
 ];
-
-// Generate message based on user personality and channel topic
-const generateMessage = (username: string, channelTopic: ChannelTopic) => {
-  const personality = userPersonalities[username];
-  const baseMessage = channelTopic.generateMessage(username);
-
-  // 30% chance to add a personality-driven phrase
-  if (faker.datatype.boolean({ probability: 0.3 })) {
-    return `${baseMessage} ${faker.helpers.arrayElement(personality.phrases)}`;
-  }
-
-  return baseMessage;
-};
 
 // Generate realistic file attachments
 const generateFile = () => {
@@ -242,195 +172,406 @@ const generateFile = () => {
   };
 };
 
+// Add general channel configuration
+const GENERAL_CHANNEL: Channel = {
+  id: '00000000-0000-0000-0000-000000000001',
+  name: 'general',
+  description:
+    'Welcome to the general channel! This is a space for everyone to communicate and collaborate.',
+  is_private: false,
+  created_by: '', // Will be set to the first user's ID during seeding
+};
+
+async function createGeneralChannel(firstUserId: string) {
+  console.log('Creating general channel...');
+  const { error: channelError } = await supabase.from('channels').upsert(
+    {
+      ...GENERAL_CHANNEL,
+      created_by: firstUserId,
+    },
+    {
+      onConflict: 'id',
+      ignoreDuplicates: false,
+    }
+  );
+
+  if (channelError) {
+    console.error('Error creating general channel:', channelError);
+    throw channelError;
+  }
+
+  return GENERAL_CHANNEL.id;
+}
+
+// Add a function to verify database access
+async function verifyDatabaseAccess() {
+  console.log('Verifying database access...');
+
+  // Try to read from the profiles table
+  const { data, error } = await supabase.from('profiles').select('count').limit(1);
+
+  if (error) {
+    console.error('Error verifying database access:', error);
+    throw new Error(`Database access verification failed: ${error.message}`);
+  }
+
+  console.log('Database access verified successfully');
+}
+
 async function seedDatabase() {
   console.log('Starting database seeding...');
 
+  // Verify database access first
+  await verifyDatabaseAccess();
+
+  // First, check what exists in the database
+  console.log('Checking existing data...');
+  const { data: existingChannels, error: channelsError } = await supabase
+    .from('channels')
+    .select('name, id');
+
+  if (channelsError) {
+    console.error('Error checking channels:', channelsError);
+    throw channelsError;
+  }
+
+  console.log('Existing channels:', existingChannels);
+
   // Delete existing data first
   console.log('Cleaning up existing data...');
-  await supabase.from('reactions').delete().neq('id', '');
-  await supabase.from('messages').delete().neq('id', '');
-  await supabase.from('user_channels').delete().neq('user_id', '');
+  try {
+    // First delete all messages and reactions
+    console.log('Deleting reactions...');
+    const { error: reactionsError } = await supabase
+      .from('reactions')
+      .delete()
+      .gte('id', '00000000-0000-0000-0000-000000000000');
+    if (reactionsError) throw reactionsError;
 
-  // Delete all channels except the default general channel
-  await supabase
-    .from('channels')
-    .delete()
-    .neq('id', '00000000-0000-0000-0000-000000000000')
-    .neq('name', 'general');
+    console.log('Deleting messages...');
+    const { error: messagesError } = await supabase
+      .from('messages')
+      .delete()
+      .gte('id', '00000000-0000-0000-0000-000000000000');
+    if (messagesError) throw messagesError;
 
-  // Delete existing users
-  await supabase.auth.admin
-    .listUsers()
-    .then(
-      async ({ data: { users: existingUsers } }: { data: { users: Array<{ id: string }> } }) => {
-        for (const user of existingUsers) {
-          await supabase.auth.admin.deleteUser(user.id);
+    console.log('Deleting user channels...');
+    const { error: userChannelsError } = await supabase
+      .from('user_channels')
+      .delete()
+      .gte('user_id', '00000000-0000-0000-0000-000000000000');
+    if (userChannelsError) throw userChannelsError;
+
+    console.log('Deleting channels...');
+    const { error: channelsError } = await supabase
+      .from('channels')
+      .delete()
+      .gte('id', '00000000-0000-0000-0000-000000000000');
+    if (channelsError) throw channelsError;
+
+    // Get existing users first
+    const {
+      data: { users: existingUsers },
+      error: listError,
+    } = await supabase.auth.admin.listUsers();
+    if (listError) {
+      console.error('Error listing users:', listError);
+      throw listError;
+    }
+
+    // Now delete profiles
+    console.log('Deleting profiles...');
+    const testEmails = [
+      'alice@example.com',
+      'bob@example.com',
+      'charlie@example.com',
+      'diana@example.com',
+    ];
+
+    for (const email of testEmails) {
+      const userToDelete = existingUsers.find((u) => u.email === email);
+      if (userToDelete) {
+        console.log(`Deleting profile for ${email}...`);
+        const { error: deleteError } = await supabase
+          .from('profiles')
+          .delete()
+          .eq('id', userToDelete.id);
+
+        if (deleteError) {
+          console.warn(`Warning: Could not delete profile for ${email}:`, deleteError);
+        } else {
+          console.log(`✓ Deleted profile for ${email}`);
         }
       }
-    );
-  console.log('Cleanup completed');
+    }
 
-  // Create users in auth.users table first
+    // Finally delete auth users
+    console.log('Deleting auth users...');
+    for (const email of testEmails) {
+      const userToDelete = existingUsers.find((u) => u.email === email);
+      if (userToDelete) {
+        console.log(`Deleting auth user ${email}...`);
+        const { error: deleteError } = await supabase.auth.admin.deleteUser(userToDelete.id);
+        if (deleteError) {
+          console.warn(`Warning: Could not delete auth user ${email}:`, deleteError);
+        } else {
+          console.log(`✓ Deleted auth user ${email}`);
+        }
+      }
+    }
+
+    // Force delete any remaining profiles
+    console.log('Force deleting any remaining profiles...');
+    const { error: profilesError } = await supabase
+      .from('profiles')
+      .delete()
+      .gte('id', '00000000-0000-0000-0000-000000000000');
+    if (profilesError) throw profilesError;
+
+    // Verify cleanup
+    console.log('Verifying cleanup...');
+    const { data: remainingProfiles, error: profileCheckError } = await supabase
+      .from('profiles')
+      .select('id, username');
+
+    if (profileCheckError) throw profileCheckError;
+
+    if (remainingProfiles && remainingProfiles.length > 0) {
+      console.log('Warning: These profiles still exist:', remainingProfiles);
+      throw new Error('Cleanup failed: Some profiles still exist');
+    }
+
+    const { data: remainingChannels, error: verifyError } = await supabase
+      .from('channels')
+      .select('name, id');
+
+    if (verifyError) throw verifyError;
+
+    if (remainingChannels && remainingChannels.length > 0) {
+      console.log('Warning: These channels could not be deleted:', remainingChannels);
+      throw new Error('Cleanup failed: Some channels still exist');
+    }
+
+    console.log('Cleanup completed and verified');
+
+    // Add a delay after cleanup to ensure everything is properly cleaned up
+    console.log('Waiting for cleanup to settle...');
+    await wait(2000);
+  } catch (error) {
+    console.error('Error during cleanup:', error);
+    throw error;
+  }
+
+  // Create users first
+  console.log('Creating users...');
   const users: User[] = [];
-  const usernames = ['alice', 'bob', 'charlie', 'diana'];
-
   for (let i = 0; i < NUM_USERS; i++) {
-    const username = usernames[i];
-    const email = `${username}@example.com`;
-    const password = 'password123'; // Simple password for testing
-    const avatar_url = `https://picsum.photos/seed/${username}/200/200`; // Consistent avatar per user
+    const email = `${Object.keys(userPersonalities)[i]}@example.com`;
+    console.log(`Creating user ${email}...`);
+    try {
+      // Try creating the user with more detailed error handling
+      const { data: authData, error: createError } = await supabase.auth.admin.createUser({
+        email,
+        password: 'password123',
+        email_confirm: true,
+        user_metadata: {
+          username: email.split('@')[0],
+        },
+      });
 
-    const {
-      data: { user },
-      error: signUpError,
-    } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
+      if (createError) {
+        console.error(`Detailed error creating user ${email}:`, {
+          message: createError.message,
+          status: createError.status,
+          name: createError.name,
+          stack: createError.stack,
+        });
+        throw createError;
+      }
+
+      if (!authData?.user) {
+        console.error(`No user data returned for ${email}`);
+        throw new Error('User creation failed - no user data returned');
+      }
+
+      const userId = authData.user.id;
+      console.log(`Successfully created auth user ${email} with ID ${userId}`);
+
+      const username = email.split('@')[0];
+      console.log(`Creating/updating profile for ${username}...`);
+
+      // Use upsert instead of insert for the profile
+      const { error: profileError } = await supabase.from('profiles').upsert(
+        {
+          id: userId,
+          username,
+          avatar_url: null,
+        },
+        {
+          onConflict: 'id',
+        }
+      );
+
+      if (profileError) {
+        console.error(`Error creating profile for ${username}:`, profileError);
+        throw profileError;
+      }
+
+      console.log(`Successfully created/updated profile for ${username}`);
+
+      users.push({
+        id: userId,
         username,
-        avatar_url,
-      },
+        avatar_url: null,
+      });
+    } catch (error) {
+      console.error(`Failed to create user ${email}:`, error);
+      throw error;
+    }
+  }
+
+  // Create general channel first
+  const generalChannelId = await createGeneralChannel(users[0].id);
+
+  // Add all users to general channel
+  for (const user of users) {
+    const { error: membershipError } = await supabase.from('user_channels').insert({
+      user_id: user.id,
+      channel_id: generalChannelId,
     });
 
-    if (signUpError) {
-      console.error('Error creating user:', signUpError);
-      continue;
-    }
-
-    if (user) {
-      users.push({
-        id: user.id,
-        email: user.email!,
-        username,
-        avatar_url,
-      });
-      console.log(`Created user: ${username}`);
-    }
+    if (membershipError) throw membershipError;
   }
 
-  // Create channels
+  // Create other channels
+  console.log('Creating channels...');
   const channels: Channel[] = [];
 
-  for (let i = 0; i < NUM_CHANNELS; i++) {
-    const topic = channelTopics[i];
-    const channelData = {
+  // Create all topic channels
+  for (let i = 0; i < channelTopics.length; i++) {
+    const channel: Channel = {
       id: faker.string.uuid(),
-      name: topic.name,
-      description: topic.description,
-      is_private: false,
-      created_by: users[0].id,
+      name: channelTopics[i].name.toLowerCase().replace(/\s+/g, '-'),
+      description: channelTopics[i].description,
+      is_private: Math.random() < 0.3, // 30% chance of being private
+      created_by: users[Math.floor(Math.random() * users.length)].id,
     };
+    channels.push(channel);
+  }
 
-    const { data: createdChannel, error } = await supabase
-      .from('channels')
-      .insert(channelData)
-      .select()
-      .single();
+  // Insert the channels into the database
+  console.log('Inserting channels into database...');
+  const { error: insertChannelsError } = await supabase.from('channels').insert(channels);
 
-    if (error) {
-      console.error('Error creating channel:', error);
-      continue;
-    }
+  if (insertChannelsError) {
+    console.error('Error inserting channels:', insertChannelsError);
+    throw insertChannelsError;
+  }
 
-    if (createdChannel) {
-      channels.push(createdChannel);
-      console.log(`Created channel: ${topic.name}`);
+  // Add users to channels
+  console.log('Adding users to channels...');
+  for (const channel of channels) {
+    // Add a random subset of users to each channel
+    const channelUsers = faker.helpers.arrayElements(
+      users,
+      faker.number.int({ min: 2, max: users.length })
+    );
 
-      // Add all users to each channel
-      for (const user of users) {
-        const { error: membershipError } = await supabase.from('user_channels').insert({
-          user_id: user.id,
-          channel_id: createdChannel.id,
-          role: 'member',
-        });
+    for (const user of channelUsers) {
+      const { error: membershipError } = await supabase.from('user_channels').insert({
+        user_id: user.id,
+        channel_id: channel.id,
+      });
 
-        if (membershipError) {
-          console.error(
-            `Error adding user ${user.username} to channel ${createdChannel.name}:`,
-            membershipError
-          );
-        }
+      if (membershipError) {
+        console.error(
+          `Error adding user ${user.username} to channel ${channel.name}:`,
+          membershipError
+        );
+        throw membershipError;
       }
     }
   }
 
-  // Create messages and threads
-  for (const channel of channels) {
-    const channelTopic = channelTopics.find((t) => t.name === channel.name)!;
+  // Load and insert the real conversations
+  console.log('Loading conversation data...');
+  const conversations = parseConversations('conversations');
 
-    // Create parent messages
-    for (let i = 0; i < MESSAGES_PER_CHANNEL; i++) {
-      const user = faker.helpers.arrayElement(users);
-      const message = {
+  // Insert messages for each channel
+  console.log('Creating messages...');
+  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // Start from 1 week ago
+
+  for (const channel of channels) {
+    const channelMessages = conversations[channel.name] || [];
+
+    // Calculate time increment to spread messages over the week
+    const totalMessages = channelMessages.length;
+    const timeIncrementMs = (7 * 24 * 60 * 60 * 1000) / (totalMessages + 1); // Spread over 1 week
+
+    console.log(`Creating ${totalMessages} messages for channel ${channel.name}...`);
+
+    // Process messages in order from the conversation file
+    for (let i = 0; i < channelMessages.length; i++) {
+      const message = channelMessages[i];
+      const user = users.find((u) => u.username === message.username);
+      if (!user) continue;
+
+      // Calculate message timestamp
+      // Add some random minutes (0-30) to make it more realistic
+      const randomMinutes = faker.number.int({ min: 0, max: 30 }) * 60 * 1000;
+      const messageTime = new Date(oneWeekAgo.getTime() + i * timeIncrementMs + randomMinutes);
+
+      const messageData = {
         id: faker.string.uuid(),
-        content: generateMessage(user.username, channelTopic),
+        content: message.content,
         user_id: user.id,
         channel_id: channel.id,
         parent_id: null,
-        created_at: faker.date.recent({ days: 30 }),
-        files: faker.datatype.boolean({ probability: FILE_PROBABILITY }) ? [generateFile()] : null,
+        created_at: messageTime,
+        files: null,
       };
 
-      const { error } = await supabase.from('messages').insert(message);
-
-      if (error) {
-        console.error('Error creating message:', error);
-        continue;
+      const { error: messageError } = await supabase.from('messages').insert([messageData]);
+      if (messageError) {
+        console.error(`Error creating message in ${channel.name}:`, messageError);
+        throw messageError;
       }
-      console.log(`Created message in channel ${channel.name} with ID ${channel.id}`);
 
-      // Add reactions with personality-based emojis
-      const numReactions = faker.number.int({ min: 0, max: REACTIONS_PER_MESSAGE });
+      // Add random reactions from other users (excluding the message author)
+      if (faker.datatype.boolean({ probability: 0.3 })) {
+        const potentialReactors = users.filter((u) => u.id !== user.id);
+        const numReactions = faker.number.int({ min: 1, max: 2 });
+        const reactors = faker.helpers.arrayElements(potentialReactors, numReactions);
 
-      for (let j = 0; j < numReactions; j++) {
-        const reactor = faker.helpers.arrayElement(users);
-        const { error } = await supabase.from('reactions').insert({
-          message_id: message.id,
+        const reactions = reactors.map((reactor) => ({
+          id: faker.string.uuid(),
+          message_id: messageData.id,
           user_id: reactor.id,
           emoji: faker.helpers.arrayElement(userPersonalities[reactor.username].reactions),
-        });
+          // Set reaction time to a few minutes after the message
+          created_at: new Date(
+            messageTime.getTime() + faker.number.int({ min: 1, max: 10 }) * 60 * 1000
+          ),
+        }));
 
-        if (error) {
-          console.error('Error creating reaction:', error);
+        const { error: reactionError } = await supabase.from('reactions').insert(reactions);
+        if (reactionError) {
+          console.error(`Error creating reactions in ${channel.name}:`, reactionError);
+          throw reactionError;
         }
       }
 
-      // Create thread replies with personality-driven responses
-      if (faker.datatype.boolean({ probability: THREAD_PROBABILITY })) {
-        const numReplies = faker.number.int({ min: 1, max: 3 });
-
-        for (let j = 0; j < numReplies; j++) {
-          const replier = faker.helpers.arrayElement(users);
-          const personality = userPersonalities[replier.username];
-
-          const reply = {
-            id: faker.string.uuid(),
-            content: faker.helpers.arrayElement(personality.phrases),
-            user_id: replier.id,
-            channel_id: channel.id,
-            parent_id: message.id,
-            created_at: faker.date.between({
-              from: message.created_at,
-              to: new Date(),
-            }),
-            files: null,
-          };
-
-          const { error } = await supabase.from('messages').insert(reply);
-
-          if (error) {
-            console.error('Error creating reply:', error);
-          } else {
-            console.log('Created thread reply');
-          }
-        }
+      // Log progress every 10 messages
+      if ((i + 1) % 10 === 0) {
+        console.log(`Created ${i + 1}/${totalMessages} messages in ${channel.name}`);
       }
     }
+
+    console.log(`✓ Completed creating messages for ${channel.name}`);
   }
 
   console.log('Database seeding completed!');
 }
 
-// Run the seeding
-seedDatabase().catch(console.error);
+// Export the function properly
+export { seedDatabase };

@@ -3,7 +3,7 @@ import { env } from './env';
 import { generateEmbedding } from './embeddings';
 
 // Constants
-const SIMILARITY_THRESHOLD = 0.25; // Lowered from 0.3 to catch more relevant matches while maintaining reasonable relevance
+const SIMILARITY_THRESHOLD = 0.2; // Lowered from 0.25 to catch more relevant matches
 
 export interface SearchResult {
   messageId: string;

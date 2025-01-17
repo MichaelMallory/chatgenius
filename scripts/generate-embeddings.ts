@@ -47,6 +47,7 @@ async function generateEmbeddings() {
       content,
       channel_id,
       user_id,
+      created_at,
       profiles (username),
       channels (name),
       vector_embeddings!left (message_id)
@@ -91,7 +92,7 @@ async function generateEmbeddings() {
               channelId: message.channel_id,
               userId: message.user_id,
               username: message.profiles.username,
-              channelName: message.channels.name,
+              channelName: message.channels?.name || 'unknown',
               createdAt: message.created_at,
             },
           };

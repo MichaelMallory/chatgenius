@@ -1,26 +1,28 @@
-'use client'
+'use client';
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useSupabase } from '@/components/providers/supabase-provider'
-import { Card, CardContent } from '@/components/ui/card'
-import { Loader2 } from 'lucide-react'
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useSupabase } from '@/components/providers/supabase-provider';
+import { Card, CardContent } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
 
 export default function HomePage() {
-  const router = useRouter()
-  const { supabase } = useSupabase()
+  const router = useRouter();
+  const { supabase } = useSupabase();
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (user) {
-        router.push('/channels/general')
+        router.push('/channels/00000000-0000-0000-0000-000000000001');
       } else {
-        router.push('/sign-in')
+        router.push('/sign-in');
       }
-    }
-    checkAuth()
-  }, [router, supabase])
+    };
+    checkAuth();
+  }, [router, supabase]);
 
   return (
     <div className="container mx-auto p-8">
@@ -31,5 +33,5 @@ export default function HomePage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
